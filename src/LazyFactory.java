@@ -31,6 +31,7 @@ public class LazyFactory {
 
     public static <T> Lazy<T> createLazy3(Supplier<T> supplier) {
         class AtomicLazyHelper implements Lazy<T> {
+            @SuppressWarnings("unused")
             private volatile Lazy lazy = LazyFactory.createLazy1(supplier);
             private final AtomicReferenceFieldUpdater<AtomicLazyHelper, Lazy> updater =
                     AtomicReferenceFieldUpdater.newUpdater(AtomicLazyHelper.class, Lazy.class, "lazy");
