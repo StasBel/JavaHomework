@@ -36,7 +36,8 @@ public class LazyFactory {
             private final AtomicReferenceFieldUpdater<AtomicLazyHelper, Lazy> updater =
                     AtomicReferenceFieldUpdater.newUpdater(AtomicLazyHelper.class, Lazy.class, "lazy");
 
-            @Override @SuppressWarnings("unchecked")
+            @Override
+            @SuppressWarnings("unchecked")
             public T get() {
                 return (T) updater.get(this).get();
             }

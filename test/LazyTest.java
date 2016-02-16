@@ -50,7 +50,8 @@ public class LazyTest {
         assertFalse(lazy.get().equals(1));
     }
 
-    @Test @SuppressWarnings("all")
+    @Test
+    @SuppressWarnings("all")
     public void testHard1() {
         supplier1WithCounting.setCount(0);
         Lazy<Integer> lazy = LazyFactory.createLazy1(supplier1WithCounting);
@@ -69,7 +70,8 @@ public class LazyTest {
         assertFalse(lazy.get().equals(1));
     }
 
-    @Test @SuppressWarnings("all")
+    @Test
+    @SuppressWarnings("all")
     public void testHard2() {
         supplier1WithCounting.setCount(0);
         Lazy<Integer> lazy = LazyFactory.createLazy2(supplier1WithCounting);
@@ -97,7 +99,8 @@ public class LazyTest {
         assertFalse(lazy.get().equals(1));
     }
 
-    @Test @SuppressWarnings("all")
+    @Test
+    @SuppressWarnings("all")
     public void testHard3() {
         Lazy<Integer> lazy = LazyFactory.createLazy3(supplier1);
         Integer integer = lazy.get();
