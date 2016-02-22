@@ -1,7 +1,6 @@
-package sp;
+package ru.spbau.mit.belyaev;
 
 public class Artist {
-
     private final String name;
 
     public Artist(String name) {

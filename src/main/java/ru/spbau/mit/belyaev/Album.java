@@ -1,10 +1,9 @@
-package sp;
+package ru.spbau.mit.belyaev;
 
 import java.util.Arrays;
 import java.util.List;
 
 public class Album {
-
     private final String name;
     private final List<Track> tracks;
     private final Artist artist;

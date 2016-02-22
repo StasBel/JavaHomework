@@ -1,7 +1,6 @@
-package sp;
+package ru.spbau.mit.belyaev;
 
 public class Track {
-
     private final String name;
     private final int rating;
 

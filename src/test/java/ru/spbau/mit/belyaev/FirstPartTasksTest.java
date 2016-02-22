@@ -1,6 +1,7 @@
-package sp;
+package ru.spbau.mit.belyaev;
 
 import com.google.common.collect.ImmutableMap;
+import org.junit.Assert;
 import org.junit.Test;
 
 import java.util.Arrays;
@@ -10,165 +11,162 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
-import static org.junit.Assert.*;
-import static sp.FirstPartTasks.*;
-
 public class FirstPartTasksTest {
 
     @Test
     public void testAllNames() {
-        assertEquals(
+        Assert.assertEquals(
                 Arrays.asList("Sun Structures", "Keep In The Dark"),
-                allNames(Stream.of(ALBUM_0, ALBUM_1)));
+                FirstPartTasks.allNames(Stream.of(ALBUM_0, ALBUM_1)));
 
-        assertEquals(
+        Assert.assertEquals(
                 Collections.emptyList(),
-                allNames(Stream.of()));
+                FirstPartTasks.allNames(Stream.of()));
     }
 
     @Test
     public void testAllNamesSorted() {
-        assertEquals(
+        Assert.assertEquals(
                 Arrays.asList("Keep In The Dark", "Sun Structures"),
-                allNamesSorted(Stream.of(ALBUM_0, ALBUM_1)));
+                FirstPartTasks.allNamesSorted(Stream.of(ALBUM_0, ALBUM_1)));
 
-        assertEquals(
+        Assert.assertEquals(
                 Collections.emptyList(),
-                allNamesSorted(Stream.of()));
+                FirstPartTasks.allNamesSorted(Stream.of()));
     }
 
     @Test
     public void testAllTracksSorted() {
-        assertEquals(
+        Assert.assertEquals(
                 Arrays.asList(
                         "A Question Isn't Answered", "Colours to Life", "Fragment's Light",
                         "Jewel of Mine Eye", "Keep in the Dark", "Keep in the Dark", "Mesmerise",
                         "Move With The Season", "Sand Dance", "Shelter Song", "Sun Structures",
                         "Test of Time", "The Golden Throne", "The Guesser"),
-                allTracksSorted(Stream.of(ALBUM_0, ALBUM_1)));
+                FirstPartTasks.allTracksSorted(Stream.of(ALBUM_0, ALBUM_1)));
 
-        assertEquals(
+        Assert.assertEquals(
                 Collections.emptyList(),
-                allTracksSorted(Stream.of()));
+                FirstPartTasks.allTracksSorted(Stream.of()));
     }
 
     @Test
     public void testSortedFavorites() {
-        assertEquals(
+        Assert.assertEquals(
                 Arrays.asList(ALBUM_13, ALBUM_18, ALBUM_10, ALBUM_5, ALBUM_12, ALBUM_4),
-                sortedFavorites(Stream.of(ALL_ALBUMS)));
+                FirstPartTasks.sortedFavorites(Stream.of(ALL_ALBUMS)));
 
-        assertEquals(
+        Assert.assertEquals(
                 Collections.emptyList(),
-                sortedFavorites(Stream.of()));
+                FirstPartTasks.sortedFavorites(Stream.of()));
     }
 
     @Test
     public void testGroupByArtist() {
-        assertEquals(
+        Assert.assertEquals(
                 ImmutableMap.of(
                         ARTIST_0, Arrays.asList(ALBUM_2, ALBUM_3),
                         ARTIST_3, Arrays.asList(ALBUM_9, ALBUM_10),
                         ARTIST_7, Arrays.asList(ALBUM_17, ALBUM_19)),
-                groupByArtist(Stream.of(ALBUM_2, ALBUM_9, ALBUM_3, ALBUM_10, ALBUM_17, ALBUM_19)));
+                FirstPartTasks.groupByArtist(Stream.of(ALBUM_2, ALBUM_9, ALBUM_3, ALBUM_10, ALBUM_17, ALBUM_19)));
 
-        assertEquals(
+        Assert.assertEquals(
                 Collections.emptyMap(),
-                groupByArtist(Stream.of()));
+                FirstPartTasks.groupByArtist(Stream.of()));
     }
 
     @Test
     public void testGroupByArtistMapName() {
-        assertEquals(
+        Assert.assertEquals(
                 ImmutableMap.of(
                         ARTIST_0, Arrays.asList(ALBUM_2.getName(), ALBUM_3.getName()),
                         ARTIST_3, Arrays.asList(ALBUM_9.getName(), ALBUM_10.getName()),
                         ARTIST_7, Arrays.asList(ALBUM_17.getName(), ALBUM_19.getName())),
-                groupByArtistMapName(Stream.of(ALBUM_2, ALBUM_9, ALBUM_3, ALBUM_10, ALBUM_17, ALBUM_19)));
+                FirstPartTasks.groupByArtistMapName(Stream.of(ALBUM_2, ALBUM_9, ALBUM_3, ALBUM_10, ALBUM_17, ALBUM_19)));
 
-        assertEquals(
+        Assert.assertEquals(
                 Collections.emptyMap(),
-                groupByArtistMapName(Stream.of()));
+                FirstPartTasks.groupByArtistMapName(Stream.of()));
     }
 
     @Test
     public void testCountAlbumDuplicates() {
-        assertEquals(
+        Assert.assertEquals(
                 0,
-                countAlbumDuplicates(Stream.of(ALBUM_0, ALBUM_1, ALBUM_4)));
+                FirstPartTasks.countAlbumDuplicates(Stream.of(ALBUM_0, ALBUM_1, ALBUM_4)));
 
-        assertEquals(
+        Assert.assertEquals(
                 0,
-                countAlbumDuplicates(Stream.of()));
+                FirstPartTasks.countAlbumDuplicates(Stream.of()));
 
-        assertEquals(
+        Assert.assertEquals(
                 3,
-                countAlbumDuplicates(Stream.of(ALBUM_0, ALBUM_1, ALBUM_2, ALBUM_3, ALBUM_4, ALBUM_5, ALBUM_6,
+                FirstPartTasks.countAlbumDuplicates(Stream.of(ALBUM_0, ALBUM_1, ALBUM_2, ALBUM_3, ALBUM_4, ALBUM_5, ALBUM_6,
                         ALBUM_7, ALBUM_8, ALBUM_9, ALBUM_10, ALBUM_11, ALBUM_12, ALBUM_13, ALBUM_14, ALBUM_15, ALBUM_16,
                         ALBUM_17, ALBUM_4, ALBUM_1, ALBUM_3, ALBUM_18, ALBUM_19)));
     }
 
     @Test
     public void testMinMaxRating() {
-        assertEquals(
+        Assert.assertEquals(
                 Optional.of(ALBUM_9),
-                minMaxRating(Stream.of(ALBUM_2, ALBUM_9, ALBUM_3, ALBUM_10, ALBUM_17, ALBUM_19)));
+                FirstPartTasks.minMaxRating(Stream.of(ALBUM_2, ALBUM_9, ALBUM_3, ALBUM_10, ALBUM_17, ALBUM_19)));
 
-        assertEquals(
+        Assert.assertEquals(
                 Optional.empty(),
-                minMaxRating(Stream.of()));
+                FirstPartTasks.minMaxRating(Stream.of()));
     }
 
     @Test
     public void testSortByAverageRating() {
-        assertEquals(
+        Assert.assertEquals(
                 Arrays.asList(ALBUM_10, ALBUM_3, ALBUM_2, ALBUM_9),
-                sortByAverageRating(Stream.of(ALBUM_2, ALBUM_9, ALBUM_3, ALBUM_10)));
+                FirstPartTasks.sortByAverageRating(Stream.of(ALBUM_2, ALBUM_9, ALBUM_3, ALBUM_10)));
 
-        assertEquals(
+        Assert.assertEquals(
                 Collections.emptyList(),
-                sortByAverageRating(Stream.of()));
+                FirstPartTasks.sortByAverageRating(Stream.of()));
     }
 
     @Test
     public void testModuloProduction() {
-        assertEquals(
+        Assert.assertEquals(
                 2,
-                moduloProduction(IntStream.of(1, 3, 5, 7, 2), 4));
+                FirstPartTasks.moduloProduction(IntStream.of(1, 3, 5, 7, 2), 4));
 
-        assertEquals(
+        Assert.assertEquals(
                 720,
-                moduloProduction(IntStream.of(1, 2, 3, 4, 5, 6), 10000));
+                FirstPartTasks.moduloProduction(IntStream.of(1, 2, 3, 4, 5, 6), 10000));
     }
 
     @Test
     public void testJoinTo() {
-        assertEquals(
+        Assert.assertEquals(
                 "<abc, cde>",
-                joinTo("abc", "cde"));
+                FirstPartTasks.joinTo("abc", "cde"));
 
-        assertEquals(
+        Assert.assertEquals(
                 "<abc>",
-                joinTo("abc"));
+                FirstPartTasks.joinTo("abc"));
 
-        assertEquals(
+        Assert.assertEquals(
                 "<>",
-                joinTo());
+                FirstPartTasks.joinTo());
     }
 
     @Test
     public void testFilterIsInstance() {
-        assertEquals(
+        Assert.assertEquals(
                 Arrays.asList("", "cde"),
-                filterIsInstance(Stream.of("", 1, 2.0, "cde"), CharSequence.class).collect(Collectors.toList()));
+                FirstPartTasks.filterIsInstance(Stream.of("", 1, 2.0, "cde"), CharSequence.class).collect(Collectors.toList()));
 
-        assertEquals(
+        Assert.assertEquals(
                 Collections.emptyList(),
-                filterIsInstance(Stream.of("", 1, 2.0, "cde"), Void.class).collect(Collectors.toList()));
+                FirstPartTasks.filterIsInstance(Stream.of("", 1, 2.0, "cde"), Void.class).collect(Collectors.toList()));
 
-        assertEquals(
+        Assert.assertEquals(
                 Arrays.asList("", 1, 2.0, "cde"),
-                filterIsInstance(Stream.of("", 1, 2.0, "cde"), Object.class).collect(Collectors.toList()));
+                FirstPartTasks.filterIsInstance(Stream.of("", 1, 2.0, "cde"), Object.class).collect(Collectors.toList()));
     }
 
     private static final Artist ARTIST_0 = new Artist("Morcheeba");

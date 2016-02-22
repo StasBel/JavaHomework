@@ -1,4 +1,4 @@
-package sp;
+package ru.spbau.mit.belyaev;
 
 import java.util.List;
 import java.util.Map;
