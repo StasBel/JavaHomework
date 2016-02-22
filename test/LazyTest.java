@@ -8,10 +8,10 @@ import java.util.function.Supplier;
 import static org.junit.Assert.*;
 
 public class LazyTest {
-    private static final int TEST_SIZE = 100;
+    private static final int TEST_SIZE = 200;
 
     private class Supplier1WithCounting implements Supplier<Integer> {
-        private AtomicInteger count = new AtomicInteger(0);
+        private final AtomicInteger count = new AtomicInteger(0);
 
         public void reset() {
             count.set(0);
@@ -31,7 +31,6 @@ public class LazyTest {
     private final Supplier1WithCounting supplier1WithCounting = new Supplier1WithCounting();
 
     @Test
-    @SuppressWarnings("all")
     public void testHard1() {
         supplier1WithCounting.reset();
         Lazy<Integer> lazy = LazyFactory.createLazy1(supplier1WithCounting);
