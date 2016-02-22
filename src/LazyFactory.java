@@ -10,8 +10,8 @@ public class LazyFactory {
             @Override
             public T get() {
                 if (!isAlreadyCalculated) {
-                    isAlreadyCalculated = true;
                     result = supplier.get();
+                    isAlreadyCalculated = true;
                 }
                 return result;
             }
@@ -20,29 +20,39 @@ public class LazyFactory {
 
     public static <T> Lazy<T> createLazy2(Supplier<T> supplier) {
         return new Lazy<T>() {
-            private final Lazy<T> lazy = LazyFactory.createLazy1(supplier);
+            private final Object NONE = new Object();
+            @SuppressWarnings("unchecked")
+            private volatile T result = (T) NONE;
 
             @Override
-            public synchronized T get() {
-                return lazy.get();
+            public T get() {
+                if (result == NONE) {
+                    synchronized (this) {
+                        if (result == NONE) {
+                            result = supplier.get();
+                        }
+                    }
+                }
+                return result;
             }
         };
     }
 
     public static <T> Lazy<T> createLazy3(Supplier<T> supplier) {
-        class AtomicLazyHelper implements Lazy<T> {
-            @SuppressWarnings("unused")
-            private volatile Lazy lazy = LazyFactory.createLazy1(supplier);
-            private final AtomicReferenceFieldUpdater<AtomicLazyHelper, Lazy> updater =
-                    AtomicReferenceFieldUpdater.newUpdater(AtomicLazyHelper.class, Lazy.class, "lazy");
+        class AtomicTLazyHelper implements Lazy<T> {
+            @SuppressWarnings("all")
+            private volatile T result;
+            private final AtomicReferenceFieldUpdater<AtomicTLazyHelper, Object> updater =
+                    AtomicReferenceFieldUpdater.newUpdater(AtomicTLazyHelper.class, Object.class, "result");
 
             @Override
             @SuppressWarnings("unchecked")
             public T get() {
-                return (T) updater.get(this).get();
+                updater.compareAndSet(this, result, supplier.get());
+                return result;
             }
         }
 
-        return new AtomicLazyHelper();
+        return new AtomicTLazyHelper();
     }
 }
