@@ -1,4 +1,4 @@
-group 'JavaHomework'
+group 'ru.spbau.mit.belyaev'
 version '1.0-SNAPSHOT'
 
 apply plugin: 'java'
