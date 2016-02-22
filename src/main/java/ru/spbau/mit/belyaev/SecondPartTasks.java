@@ -32,7 +32,7 @@ public final class SecondPartTasks {
     // Стрелок атакует мишень и каждый раз попадает в произвольную точку квадрата.
     // Надо промоделировать этот процесс с помощью класса java.util.Random и посчитать, какова вероятность попасть в мишень.
     private static final Random RANDOM = new Random();
-    private static final Integer ROUNDS = 100000000;
+    private static final Integer TRIES = 100000000;
     private static final double RADIUS = 0.5d;
 
     private static double sqr(double value) {
@@ -46,7 +46,7 @@ public final class SecondPartTasks {
     public static double piDividedBy4() {
         return DoubleStream
                 .generate(() -> calcDist(RANDOM.nextDouble(), RANDOM.nextDouble()))
-                .limit(ROUNDS)
+                .limit(TRIES)
                 .map(dist -> dist <= RADIUS ? 1 : 0)
                 .average()
                 .getAsDouble();
