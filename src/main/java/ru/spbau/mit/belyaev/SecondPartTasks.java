@@ -32,7 +32,7 @@ public final class SecondPartTasks {
     // Стрелок атакует мишень и каждый раз попадает в произвольную точку квадрата.
     // Надо промоделировать этот процесс с помощью класса java.util.Random и посчитать, какова вероятность попасть в мишень.
     private static final Random RANDOM = new Random();
-    private static final Integer ROUNDS = 10000000;
+    private static final Integer ROUNDS = 100000000;
     private static final double RADIUS = 0.5d;
 
     private static double sqr(double value) {
