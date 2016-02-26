@@ -21,7 +21,7 @@ public class SecondPartTasksTest {
 
         assertEquals(answer, SecondPartTasks.findQuotes(paths, "S"));
 
-        assertEquals(new ArrayList<String>(), SecondPartTasks.findQuotes(paths, "the jesus was black"));
+        assertEquals(Collections.emptyList(), SecondPartTasks.findQuotes(paths, "the jesus was black"));
     }
 
     @Test
@@ -40,7 +40,7 @@ public class SecondPartTasksTest {
 
         assertEquals("Aksenov", SecondPartTasks.findPrinter(compositions));
 
-        assertEquals(null, SecondPartTasks.findPrinter(new HashMap<>()));
+        assertNull(SecondPartTasks.findPrinter(Collections.emptyMap()));
     }
 
     @Test
@@ -73,6 +73,6 @@ public class SecondPartTasksTest {
 
         assertEquals(sumOrder, SecondPartTasks.calculateGlobalOrder(orders));
 
-        assertEquals(new HashMap<>(), SecondPartTasks.calculateGlobalOrder(new ArrayList<>()));
+        assertEquals(Collections.emptyMap(), SecondPartTasks.calculateGlobalOrder(Collections.emptyList()));
     }
 }

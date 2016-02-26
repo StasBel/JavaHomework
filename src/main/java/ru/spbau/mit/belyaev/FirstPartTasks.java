@@ -42,9 +42,9 @@ public final class FirstPartTasks {
                 .filter(album -> album.getTracks()
                         .stream()
                         .anyMatch(track -> track.getRating() > 95))
-                .sorted((album1, album2) -> album1.getName()
-                        .compareTo(album2.getName()))
+                .sorted((Comparator.comparing(Album::getName)))
                 .collect(Collectors.toList());
+
     }
 
     // Сгруппировать альбомы по артистам

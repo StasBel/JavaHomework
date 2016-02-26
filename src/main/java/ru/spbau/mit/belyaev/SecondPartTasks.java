@@ -9,6 +9,9 @@ import java.util.stream.DoubleStream;
 import java.util.stream.Stream;
 
 public final class SecondPartTasks {
+    private static final Random RANDOM = new Random();
+    private static final int TRIES = 100000000;
+    private static final double RADIUS = 0.5d;
 
     private SecondPartTasks() {
     }
@@ -31,10 +34,6 @@ public final class SecondPartTasks {
     // В квадрат с длиной стороны 1 вписана мишень.
     // Стрелок атакует мишень и каждый раз попадает в произвольную точку квадрата.
     // Надо промоделировать этот процесс с помощью класса java.util.Random и посчитать, какова вероятность попасть в мишень.
-    private static final Random RANDOM = new Random();
-    private static final Integer TRIES = 100000000;
-    private static final double RADIUS = 0.5d;
-
     private static double sqr(double value) {
         return Math.pow(value, 2);
     }
@@ -62,8 +61,8 @@ public final class SecondPartTasks {
                         .stream()
                         .mapToInt(String::length)
                         .sum()))
-                .orElse(new AbstractMap.SimpleEntry<>(null, null))
-                .getKey();
+                .map(Map.Entry::getKey)
+                .orElse(null);
     }
 
     // Вы крупный поставщик продуктов. Каждая торговая сеть делает вам заказ в виде Map<Товар, Количество>.
