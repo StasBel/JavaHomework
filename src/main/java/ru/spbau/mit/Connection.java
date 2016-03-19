@@ -1,0 +1,26 @@
+package ru.spbau.mit;
+
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.net.Socket;
+
+/**
+ * Created by belaevstanislav on 14.03.16.
+ */
+
+public abstract class Connection {
+    protected final DataInputStream dataInputStream;
+    protected final DataOutputStream dataOutputStream;
+    private final Socket socket;
+
+    public Connection(Socket socket) throws IOException {
+        this.socket = socket;
+        this.dataInputStream = new DataInputStream(socket.getInputStream());
+        this.dataOutputStream = new DataOutputStream(socket.getOutputStream());
+    }
+
+    public void close() throws IOException {
+        socket.close();
+    }
+}
