@@ -7,11 +7,12 @@ import java.net.Socket;
 
 /**
  * Created by belaevstanislav on 14.03.16.
+ * SPBAU Java practice.
  */
 
 public abstract class Connection {
-    protected final DataInputStream dataInputStream;
-    protected final DataOutputStream dataOutputStream;
+    private final DataInputStream dataInputStream;
+    private final DataOutputStream dataOutputStream;
     private final Socket socket;
 
     public Connection(Socket socket) throws IOException {
@@ -22,5 +23,13 @@ public abstract class Connection {
 
     public void close() throws IOException {
         socket.close();
+    }
+
+    protected DataInputStream getDataInputStream() {
+        return dataInputStream;
+    }
+
+    protected DataOutputStream getDataOutputStream() {
+        return dataOutputStream;
     }
 }

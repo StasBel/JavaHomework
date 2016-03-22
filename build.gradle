@@ -2,6 +2,7 @@ group 'ru.spbau.mit.belyaev'
 version '1.0-SNAPSHOT'
 
 apply plugin: 'java'
+apply plugin: 'checkstyle'
 
 repositories {
     mavenCentral()
@@ -10,4 +11,8 @@ repositories {
 dependencies {
     testCompile group: 'junit', name: 'junit', version: '4.12'
     testCompile group: 'com.google.guava', name: 'guava', version: '19.0'
+}
+
+checkstyle {
+    toolVersion = '6.7'
 }

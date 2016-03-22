@@ -5,10 +5,11 @@ import java.net.UnknownHostException;
 
 /**
  * Created by belaevstanislav on 19.03.16.
+ * SPBAU Java practice.
  */
 
 public interface ClientAction {
-    void conect() throws UnknownHostException, IOException;
+    void connect() throws UnknownHostException, IOException;
 
     void disconnect() throws IOException;
 

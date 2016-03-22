@@ -4,6 +4,7 @@ import java.io.IOException;
 
 /**
  * Created by belaevstanislav on 14.03.16.
+ * SPBAU Java practice.
  */
 
 public interface ServerAction {

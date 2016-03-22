@@ -2,6 +2,8 @@ package ru.spbau.mit.server;
 
 import ru.spbau.mit.Connection;
 
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -15,6 +17,7 @@ import java.util.stream.Collectors;
 
 /**
  * Created by belaevstanislav on 14.03.16.
+ * SPBAU Java practice.
  */
 
 public class Server implements ServerAction {
@@ -26,7 +29,7 @@ public class Server implements ServerAction {
         this.threadPool = Executors.newCachedThreadPool();
     }
 
-    private void handleConnetion(Socket socket) throws IOException {
+    private void handleConnection(Socket socket) throws IOException {
         ServerConnection connection = new ServerConnection(socket);
 
         switch (connection.readQueryType()) {
@@ -47,7 +50,7 @@ public class Server implements ServerAction {
     private void run() {
         while (true) {
             try {
-                handleConnetion(serverSocket.accept());
+                handleConnection(serverSocket.accept());
             } catch (IOException e) {
                 break;
             }
@@ -71,8 +74,13 @@ public class Server implements ServerAction {
     }
 
     private class ServerConnection extends Connection {
+        private final DataInputStream dataInputStream;
+        private final DataOutputStream dataOutputStream;
+
         public ServerConnection(Socket socket) throws IOException {
             super(socket);
+            this.dataInputStream = getDataInputStream();
+            this.dataOutputStream = getDataOutputStream();
         }
 
         public QueryType readQueryType() throws IOException {

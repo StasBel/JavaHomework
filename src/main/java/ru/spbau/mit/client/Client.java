@@ -3,6 +3,8 @@ package ru.spbau.mit.client;
 import ru.spbau.mit.Connection;
 import ru.spbau.mit.File;
 
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.Socket;
@@ -12,6 +14,7 @@ import java.util.List;
 
 /**
  * Created by belaevstanislav on 14.03.16.
+ * SPBAU Java practice.
  */
 
 public class Client implements ClientAction {
@@ -28,8 +31,10 @@ public class Client implements ClientAction {
     }
 
     @Override
-    public void conect() throws UnknownHostException, IOException {
-        connection = new ClientConnection((new Socket(InetAddress.getByName(ipAddress), portNumber)));
+    public void connect() throws UnknownHostException, IOException {
+        connection = new ClientConnection(
+                new Socket(InetAddress.getByName(ipAddress), portNumber)
+        );
     }
 
     @Override
@@ -50,8 +55,13 @@ public class Client implements ClientAction {
     }
 
     private class ClientConnection extends Connection {
+        private final DataInputStream dataInputStream;
+        private final DataOutputStream dataOutputStream;
+
         public ClientConnection(Socket socket) throws IOException {
             super(socket);
+            this.dataInputStream = getDataInputStream();
+            this.dataOutputStream = getDataOutputStream();
         }
 
         public void executeList(String path) throws IOException {
