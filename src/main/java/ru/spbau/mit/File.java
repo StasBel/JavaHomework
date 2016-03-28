@@ -19,7 +19,7 @@ public class File {
     public boolean equals(Object obj) {
         if (obj instanceof File) {
             File that = (File) obj;
-            return ((name.equals(that.name)) && (isDir == that.isDir));
+            return name.equals(that.name) && isDir == that.isDir;
         } else {
             return false;
         }

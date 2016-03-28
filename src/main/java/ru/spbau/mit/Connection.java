@@ -17,12 +17,16 @@ public abstract class Connection {
 
     public Connection(Socket socket) throws IOException {
         this.socket = socket;
-        this.dataInputStream = new DataInputStream(socket.getInputStream());
-        this.dataOutputStream = new DataOutputStream(socket.getOutputStream());
+        dataInputStream = new DataInputStream(socket.getInputStream());
+        dataOutputStream = new DataOutputStream(socket.getOutputStream());
     }
 
     public void close() throws IOException {
         socket.close();
+    }
+
+    public boolean isConnected() {
+        return socket.isConnected();
     }
 
     protected DataInputStream getDataInputStream() {

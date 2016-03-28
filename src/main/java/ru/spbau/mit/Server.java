@@ -1,6 +1,6 @@
-package ru.spbau.mit.server;
+package ru.spbau.mit;
 
-import ru.spbau.mit.Connection;
+import org.apache.commons.io.IOUtils;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -11,8 +11,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
 /**
@@ -20,13 +18,21 @@ import java.util.stream.Collectors;
  * SPBAU Java practice.
  */
 
-public class Server implements ServerAction {
+public class Server {
     private final ServerSocket serverSocket;
-    private final ExecutorService threadPool;
+    private final Thread mainThread;
 
     public Server(int portNumber) throws IOException {
-        this.serverSocket = new ServerSocket(portNumber);
-        this.threadPool = Executors.newCachedThreadPool();
+        serverSocket = new ServerSocket(portNumber);
+        mainThread = new Thread(this::run);
+    }
+
+    public void start() {
+        mainThread.start();
+    }
+
+    public void stop() throws IOException {
+        serverSocket.close();
     }
 
     private void handleConnection(Socket socket) throws IOException {
@@ -57,30 +63,19 @@ public class Server implements ServerAction {
         }
     }
 
-    @Override
-    public void start() {
-        threadPool.submit(this::run);
-    }
-
-    @Override
-    public void stop() throws IOException {
-        threadPool.shutdown();
-        serverSocket.close();
-    }
-
-    private enum QueryType {
+    private static enum QueryType {
         LIST,
         GET;
     }
 
-    private class ServerConnection extends Connection {
+    private static class ServerConnection extends Connection {
         private final DataInputStream dataInputStream;
         private final DataOutputStream dataOutputStream;
 
         public ServerConnection(Socket socket) throws IOException {
             super(socket);
-            this.dataInputStream = getDataInputStream();
-            this.dataOutputStream = getDataOutputStream();
+            dataInputStream = getDataInputStream();
+            dataOutputStream = getDataOutputStream();
         }
 
         public QueryType readQueryType() throws IOException {
@@ -95,24 +90,33 @@ public class Server implements ServerAction {
         }
 
         public void doList() throws IOException {
-            String path = dataInputStream.readUTF();
+            String pathStr = dataInputStream.readUTF();
+            Path path = Paths.get(pathStr);
 
-            List<Path> files = Files.list(Paths.get(path)).collect(Collectors.toList());
-            dataOutputStream.writeInt(files.size());
-            for (Path file : files) {
-                dataOutputStream.writeUTF(file.getFileName().toString());
-                dataOutputStream.writeBoolean(Files.isDirectory(file));
+            if (Files.isDirectory(path)) {
+                List<Path> files = Files.list(path).collect(Collectors.toList());
+                dataOutputStream.writeInt(files.size());
+                for (Path file : files) {
+                    dataOutputStream.writeUTF(file.getFileName().toString());
+                    dataOutputStream.writeBoolean(Files.isDirectory(file));
+                }
+            } else {
+                dataOutputStream.writeInt(0);
             }
 
             dataOutputStream.flush();
         }
 
         public void doGet() throws IOException {
-            String path = dataInputStream.readUTF();
+            String pathStr = dataInputStream.readUTF();
+            Path path = Paths.get(pathStr);
 
-            Path file = Paths.get(path);
-            dataOutputStream.writeLong(Files.size(file));
-            dataOutputStream.write(Files.readAllBytes(file));
+            if (Files.exists(path)) {
+                dataOutputStream.writeLong(Files.size(path));
+                IOUtils.copyLarge(Files.newInputStream(path), dataOutputStream);
+            } else {
+                dataOutputStream.writeLong(0L);
+            }
 
             dataOutputStream.flush();
         }

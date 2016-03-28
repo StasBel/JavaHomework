@@ -1,7 +1,6 @@
-package ru.spbau.mit.client;
+package ru.spbau.mit;
 
-import ru.spbau.mit.Connection;
-import ru.spbau.mit.File;
+import org.apache.commons.io.IOUtils;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -9,6 +8,9 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -17,7 +19,7 @@ import java.util.List;
  * SPBAU Java practice.
  */
 
-public class Client implements ClientAction {
+public class Client {
     private static final int LIST_NUMBER = 1;
     private static final int GET_NUMBER = 2;
 
@@ -30,38 +32,44 @@ public class Client implements ClientAction {
         this.ipAddress = ipAddress;
     }
 
-    @Override
     public void connect() throws UnknownHostException, IOException {
         connection = new ClientConnection(
                 new Socket(InetAddress.getByName(ipAddress), portNumber)
         );
     }
 
-    @Override
     public void disconnect() throws IOException {
-        connection.close();
+        if (connection != null && connection.isConnected()) {
+            connection.close();
+        }
     }
 
-    @Override
     public ListAnswer executeList(String path) throws IOException {
-        connection.executeList(path);
-        return connection.fetchAnswerList();
+        if (connection != null && connection.isConnected()) {
+            connection.executeList(path);
+            return connection.fetchAnswerList();
+        } else {
+            return null;
+        }
     }
 
-    @Override
     public GetAnswer executeGet(String path) throws IOException {
-        connection.executeGet(path);
-        return connection.fetchAnswerGet();
+        if (connection != null && connection.isConnected()) {
+            connection.executeGet(path);
+            return connection.fetchAnswerGet(path);
+        } else {
+            return null;
+        }
     }
 
-    private class ClientConnection extends Connection {
+    private static class ClientConnection extends Connection {
         private final DataInputStream dataInputStream;
         private final DataOutputStream dataOutputStream;
 
         public ClientConnection(Socket socket) throws IOException {
             super(socket);
-            this.dataInputStream = getDataInputStream();
-            this.dataOutputStream = getDataOutputStream();
+            dataInputStream = getDataInputStream();
+            dataOutputStream = getDataOutputStream();
         }
 
         public void executeList(String path) throws IOException {
@@ -87,18 +95,18 @@ public class Client implements ClientAction {
             dataOutputStream.flush();
         }
 
-        public GetAnswer fetchAnswerGet() throws IOException {
+        public GetAnswer fetchAnswerGet(String pathStr) throws IOException {
             long size = dataInputStream.readLong();
-            byte[] content = new byte[(int) size];
-            int position = 0;
-            while (position < content.length) {
-                position += dataInputStream.read(content, position, content.length - position);
+            Path path = null;
+            if (size > 0) {
+                path = Files.createFile(Paths.get(pathStr).getFileName());
+                IOUtils.copyLarge(dataInputStream, Files.newOutputStream(path));
             }
-            return new GetAnswer(size, content);
+            return new GetAnswer(size, path);
         }
     }
 
-    public class ListAnswer {
+    public static class ListAnswer {
         private final int size;
         private final List<File> files;
 
@@ -116,21 +124,21 @@ public class Client implements ClientAction {
         }
     }
 
-    public class GetAnswer {
+    public static class GetAnswer {
         private final long size;
-        private final byte[] content;
+        private final Path path;
 
-        public GetAnswer(long size, byte[] content) {
+        public GetAnswer(long size, Path path) {
             this.size = size;
-            this.content = content;
+            this.path = path;
         }
 
         public long getSize() {
             return size;
         }
 
-        public byte[] getContent() {
-            return content;
+        public Path getPath() {
+            return path;
         }
     }
 }
