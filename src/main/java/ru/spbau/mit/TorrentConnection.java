@@ -10,30 +10,34 @@ import java.net.Socket;
  * SPBAU Java practice.
  */
 
-public abstract class Connection {
+public class TorrentConnection {
+    private final Socket socket;
     private final DataInputStream dataInputStream;
     private final DataOutputStream dataOutputStream;
-    private final Socket socket;
 
-    public Connection(Socket socket) throws IOException {
+    public TorrentConnection(Socket socket) throws IOException {
         this.socket = socket;
         dataInputStream = new DataInputStream(socket.getInputStream());
         dataOutputStream = new DataOutputStream(socket.getOutputStream());
+    }
+
+    public byte readQueryId() throws IOException {
+        return dataInputStream.readByte();
     }
 
     public void close() throws IOException {
         socket.close();
     }
 
-    public boolean isConnected() {
-        return socket.isConnected();
+    public Socket getSocket() {
+        return socket;
     }
 
-    protected DataInputStream getDataInputStream() {
+    public DataInputStream getDataInputStream() {
         return dataInputStream;
     }
 
-    protected DataOutputStream getDataOutputStream() {
+    public DataOutputStream getDataOutputStream() {
         return dataOutputStream;
     }
 }

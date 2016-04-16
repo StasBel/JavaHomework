@@ -1,26 +1,12 @@
 package ru.spbau.mit;
 
-import org.apache.commons.io.IOUtils;
-import org.junit.Test;
-
-import java.io.IOException;
-import java.net.UnknownHostException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.Arrays;
-import java.util.List;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-
 /**
  * Created by belaevstanislav on 19.03.16.
  * SPBAU Java practice.
  */
 
 public class SimpleFTPTest {
-    private static final int PORT_NUMBER = 6666;
+    /*private static final int PORT_NUMBER = 6666;
     private static final String IP_ADDRESS = "127.0.0.1";
     private static final String PATH_TO_TEST_RESOURCES = "./src/test/resources/";
     private static final int TEST_RESOURCES_DIR_SIZE = 3;
@@ -38,14 +24,14 @@ public class SimpleFTPTest {
 
     @Test
     public void test() throws UnknownHostException, IOException {
-        Server server = new Server(PORT_NUMBER);
-        server.start();
+        TorrentServer torrentServer = new TorrentServer(PORT_NUMBER);
+        torrentServer.start();
 
-        Client client = new Client(PORT_NUMBER, IP_ADDRESS);
+        TorrentClient client = new TorrentClient(PORT_NUMBER, IP_ADDRESS);
 
         // LIST
         client.connect();
-        Client.ListAnswer listAnswer = client.executeList(PATH_TO_TEST_RESOURCES);
+        TorrentClient.ListAnswer listAnswer = client.executeList(PATH_TO_TEST_RESOURCES);
         assertEquals("Size", (long) TEST_RESOURCES_DIR_SIZE, (long) listAnswer.getSize());
         assertEquals("Files", TEST_RESOURCES_FILES, listAnswer.getFiles());
         client.disconnect();
@@ -65,11 +51,11 @@ public class SimpleFTPTest {
         assertGet(client, PATH_TO_TEST_RESOURCES + FILE_3, FILE_3_SIZE);
         client.disconnect();
 
-        server.stop();
+        torrentServer.stop();
     }
 
-    private void assertGet(Client client, String path, long size) throws IOException {
-        Client.GetAnswer getAnswer1 = client.executeGet(path);
+    private void assertGet(TorrentClient client, String path, long size) throws IOException {
+        TorrentClient.GetAnswer getAnswer1 = client.executeGet(path);
 
         assertEquals("Size", size, getAnswer1.getSize());
 
@@ -82,5 +68,5 @@ public class SimpleFTPTest {
         );
 
         Files.delete(filePath);
-    }
+    }*/
 }
