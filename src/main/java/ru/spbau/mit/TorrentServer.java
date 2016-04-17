@@ -1,9 +1,6 @@
 package ru.spbau.mit;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
-import java.io.Serializable;
+import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.HashMap;
@@ -29,22 +26,64 @@ public class TorrentServer {
     private static final int MAX_FILES = 1073741824;
     private static final int IP_ADDRESS_BYTE_COUNT = 4;
     private static final long ACTIVE_SEED_TIME_MILLIS = 300000;
+    private static final String DEFAULT_DIRECTORY_STR = "./";
+    private static final String SAVE_FILES_FILE_NAME = "ServerData.ser";
     private static final Logger LOG = Logger.getLogger(TorrentServer.class.getName());
     private static final String WRONG_TYPE_OF_QUERY_MESSAGE = "Wrong type of query!";
     private static final String CONNECTION_OVER_MESSAGE = "Connection is over!";
     private static final String BAD_CONNECTION_MESSAGE = "Something went wrong with connection!";
     private static final String BAD_IO_NEW_CONNECTIONS_MESSAGE = "Bad I/O while waiting for a connection!";
+    private static final String TOO_MANY_ARGS_MESSAGE = "To many arguments!";
+    private static final String NEW_SERVER_ERROR_MESSAGE = "Fail to create new server!";
+    private static final String STOP_SERVER_ERROR_MESSAGE = "Fail to stop server!";
+    private static final String FAIL_TO_LOAD_FILES_MESSAGE = "Fail to load files!";
+    private static final String FAIL_TO_SAVE_FILES_MESSAGE = "Fail to save files!";
 
+    private final java.io.File savingFile;
     private final ServerSocket serverSocket;
     private final ExecutorService threadPool;
     private final Map<Integer, File> files;
     private int idCounter;
 
-    public TorrentServer() throws IOException {
+    public TorrentServer(String directoryStr) throws IOException {
+        savingFile = new java.io.File(directoryStr, SAVE_FILES_FILE_NAME);
+        if (savingFile.exists()) {
+            files = loadFiles();
+        } else {
+            files = new HashMap<Integer, File>();
+        }
         serverSocket = new ServerSocket(PORT_NUMBER);
         threadPool = Executors.newCachedThreadPool();
-        files = new HashMap<Integer, File>();
         idCounter = -1;
+    }
+
+    public static void main(String[] args) {
+        final TorrentServer server;
+
+        if (args.length > 1) {
+            LOG.warning(TOO_MANY_ARGS_MESSAGE);
+            System.exit(1);
+        }
+
+        try {
+            if (args.length == 0) {
+                server = new TorrentServer(DEFAULT_DIRECTORY_STR);
+            } else {
+                server = new TorrentServer(args[0]);
+            }
+
+            server.start();
+
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                try {
+                    server.stop();
+                } catch (IOException e) {
+                    LOG.warning(STOP_SERVER_ERROR_MESSAGE);
+                }
+            }));
+        } catch (IOException e) {
+            LOG.severe(NEW_SERVER_ERROR_MESSAGE);
+        }
     }
 
     public void start() {
@@ -54,6 +93,35 @@ public class TorrentServer {
     public void stop() throws IOException {
         threadPool.shutdown();
         serverSocket.close();
+        saveFiles();
+    }
+
+    private HashMap<Integer, File> loadFiles() {
+        HashMap<Integer, File> result;
+        try {
+            final FileInputStream fileInputStream = new FileInputStream(savingFile);
+            final ObjectInputStream objectInputStream = new ObjectInputStream(fileInputStream);
+            result = (HashMap<Integer, File>) objectInputStream.readObject();
+            objectInputStream.close();
+            fileInputStream.close();
+        } catch (IOException | ClassNotFoundException e) {
+            LOG.warning(FAIL_TO_LOAD_FILES_MESSAGE);
+            result = new HashMap<Integer, File>();
+        }
+        return result;
+    }
+
+    private void saveFiles() {
+        try {
+            final FileOutputStream fileOutputStream = new FileOutputStream(savingFile);
+            final ObjectOutputStream objectOutputStream = new ObjectOutputStream(fileOutputStream);
+            objectOutputStream.writeObject(files);
+            objectOutputStream.flush();
+            objectOutputStream.close();
+            fileOutputStream.close();
+        } catch (IOException e) {
+            LOG.warning(FAIL_TO_SAVE_FILES_MESSAGE);
+        }
     }
 
     private void handleConnection(Socket socket) {
@@ -73,7 +141,7 @@ public class TorrentServer {
                         doUpdate(connection);
                         break;
                     default:
-                        LOG.warning(WRONG_TYPE_OF_QUERY_MESSAGE);
+                        LOG.severe(WRONG_TYPE_OF_QUERY_MESSAGE);
                         break;
                 }
             }
