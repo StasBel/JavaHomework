@@ -6,9 +6,13 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.*;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.TreeSet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.logging.Logger;
 
 /**
  * Created by belaevstanislav on 14.03.16.
@@ -24,8 +28,12 @@ public class TorrentServer {
     private static final int PORT_NUMBER = 8081;
     private static final int MAX_FILES = 1073741824;
     private static final int IP_ADDRESS_BYTE_COUNT = 4;
-    private static final long ACTIVE_SEED_TIME_MILLIS = 300001;
+    private static final long ACTIVE_SEED_TIME_MILLIS = 300000;
+    private static final Logger LOG = Logger.getLogger(TorrentServer.class.getName());
     private static final String WRONG_TYPE_OF_QUERY_MESSAGE = "Wrong type of query!";
+    private static final String CONNECTION_OVER_MESSAGE = "Connection is over!";
+    private static final String BAD_CONNECTION_MESSAGE = "Something went wrong with connection!";
+    private static final String BAD_IO_NEW_CONNECTIONS_MESSAGE = "Bad I/O while waiting for a connection!";
 
     private final ServerSocket serverSocket;
     private final ExecutorService threadPool;
@@ -49,35 +57,32 @@ public class TorrentServer {
     }
 
     private void handleConnection(Socket socket) {
-        try {
-            final TorrentConnection connection = new TorrentConnection(socket);
-
-            switch (connection.readQueryId()) {
-                case LIST_QUERY_ID:
-                    doList(connection);
-                    break;
-                case UPLOAD_QUERY_ID:
-                    doUpload(connection);
-                    break;
-                case SOURCES_QUERY_ID:
-                    doSources(connection);
-                    break;
-                case UPDATE_QUERY_ID:
-                    doUpdate(connection);
-                    break;
-                default:
-                    System.err.println(WRONG_TYPE_OF_QUERY_MESSAGE);
-                    break;
+        try (TorrentConnection connection = new TorrentConnection(socket)) {
+            while (true) {
+                switch (connection.readQueryId()) {
+                    case LIST_QUERY_ID:
+                        doList(connection);
+                        break;
+                    case UPLOAD_QUERY_ID:
+                        doUpload(connection);
+                        break;
+                    case SOURCES_QUERY_ID:
+                        doSources(connection);
+                        break;
+                    case UPDATE_QUERY_ID:
+                        doUpdate(connection);
+                        break;
+                    default:
+                        LOG.warning(WRONG_TYPE_OF_QUERY_MESSAGE);
+                        break;
+                }
             }
-
-            connection.close();
         } catch (IOException e) {
-            // TODO ???
+            LOG.warning(BAD_CONNECTION_MESSAGE);
         }
+
+        LOG.info(CONNECTION_OVER_MESSAGE);
     }
-
-
-    // TODO !!! эти методы вызывают много потоков, но connection для каждого уникален
 
     private void run() {
         while (true) {
@@ -85,6 +90,7 @@ public class TorrentServer {
                 final Socket socket = serverSocket.accept();
                 threadPool.submit(() -> handleConnection(socket));
             } catch (IOException e) {
+                LOG.warning(BAD_IO_NEW_CONNECTIONS_MESSAGE);
                 break;
             }
         }
@@ -135,15 +141,13 @@ public class TorrentServer {
 
         final int id = dataInputStream.readInt();
 
-        final Set<Seed> seeds;
+        final Seeds seeds;
         synchronized (files) {
             seeds = files.get(id).seeds;
         }
 
         synchronized (seeds) {
-            for (Seed seed : seeds) {
-                seed.checkLastTime(seeds);
-            }
+            seeds.removeInactive();
 
             dataOutputStream.writeInt(seeds.size());
 
@@ -158,33 +162,41 @@ public class TorrentServer {
         }
     }
 
-    // TODO check every 5 min?
     private void doUpdate(TorrentConnection connection) throws IOException {
         final DataInputStream dataInputStream = connection.getDataInputStream();
         final DataOutputStream dataOutputStream = connection.getDataOutputStream();
 
-        final byte[] ip = connection.getSocket().getInetAddress().getAddress();
-        final short port = dataInputStream.readShort();
+        try {
+            final byte[] ip = connection.getSocket().getInetAddress().getAddress();
+            final short port = dataInputStream.readShort();
+            final int count = dataInputStream.readInt();
 
-        final int count = dataInputStream.readInt();
-        for (int i = 0; i < count; i++) {
-            final int id = dataInputStream.readInt();
+            for (int i = 0; i < count; i++) {
+                final int id = dataInputStream.readInt();
 
-            final Set<Seed> seeds;
-            synchronized (files) {
-                seeds = files.get(id).seeds;
-            }
-
-            synchronized (seeds) {
-                final Seed seed = new Seed(ip, port);
-                if (!seeds.contains(seed)) {
-                    seeds.add(seed);
+                final Seeds seeds;
+                synchronized (files) {
+                    seeds = files.get(id).seeds;
                 }
-                seed.resetTime();
+
+                synchronized (seeds) {
+                    final Seed freshSeed = new Seed(ip, port);
+                    final Seed oldSeed = seeds.ceiling(freshSeed);
+
+                    if (oldSeed == null || freshSeed.compareTo(oldSeed) != 0) {
+                        seeds.add(freshSeed);
+                        freshSeed.resetTime();
+                    } else {
+                        oldSeed.resetTime();
+                    }
+                }
             }
+        } catch (IOException e) {
+            dataOutputStream.writeBoolean(false);
+            dataOutputStream.flush();
+            throw e;
         }
 
-        // TODO when false?
         dataOutputStream.writeBoolean(true);
         dataOutputStream.flush();
     }
@@ -192,16 +204,28 @@ public class TorrentServer {
     private static class File implements Serializable {
         private final String name;
         private final long size;
-        private final Set<Seed> seeds;
+        private final Seeds seeds;
 
         public File(String name, long size) {
             this.name = name;
             this.size = size;
-            seeds = new HashSet<>();
+            seeds = new Seeds();
         }
     }
 
-    private static class Seed implements Serializable {
+    private static class Seeds extends TreeSet<Seed> implements Serializable {
+        public void removeInactive() {
+            final Iterator<Seed> iterator = iterator();
+            while (iterator.hasNext()) {
+                final Seed seed = iterator.next();
+                if (seed.isInactive()) {
+                    iterator.remove();
+                }
+            }
+        }
+    }
+
+    private static class Seed implements Serializable, Comparable<Seed> {
         private final byte[] ip;
         private final short port;
         private Long lastTime;
@@ -212,24 +236,13 @@ public class TorrentServer {
         }
 
         @Override
-        public boolean equals(Object o) {
-            if (this == o) {
-                return true;
+        public int compareTo(Seed o) {
+            final int compareIpResult = compareIp(o.ip);
+            if (compareIpResult == 0) {
+                return ((Short) port).compareTo(o.port);
+            } else {
+                return compareIpResult;
             }
-            if (o == null || getClass() != o.getClass()) {
-                return false;
-            }
-            final Seed seed = (Seed) o;
-            return port == seed.port && Arrays.equals(ip, seed.ip);
-        }
-
-        @Override
-        public int hashCode() {
-            int ipHash = 0;
-            for (int i = 0; i < IP_ADDRESS_BYTE_COUNT; i++) {
-                ipHash = Objects.hash(ipHash, ip[i]);
-            }
-            return Objects.hash(ipHash, port);
         }
 
         public void resetTime() {
@@ -238,14 +251,22 @@ public class TorrentServer {
             }
         }
 
-        public void checkLastTime(Set<Seed> seeds) {
+        public boolean isInactive() {
             final long curTime = System.currentTimeMillis();
 
             synchronized (lastTime) {
-                if (curTime - lastTime > ACTIVE_SEED_TIME_MILLIS) {
-                    seeds.remove(this);
+                return curTime - lastTime > ACTIVE_SEED_TIME_MILLIS;
+            }
+        }
+
+        private int compareIp(byte[] ip) {
+            for (int index = 0; index < IP_ADDRESS_BYTE_COUNT; index++) {
+                final int result = ((Byte) this.ip[index]).compareTo(ip[index]);
+                if (result != 0) {
+                    return result;
                 }
             }
+            return 0;
         }
     }
 }

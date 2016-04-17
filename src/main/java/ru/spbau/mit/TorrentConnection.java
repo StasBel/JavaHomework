@@ -10,7 +10,7 @@ import java.net.Socket;
  * SPBAU Java practice.
  */
 
-public class TorrentConnection {
+public class TorrentConnection implements AutoCloseable {
     private final Socket socket;
     private final DataInputStream dataInputStream;
     private final DataOutputStream dataOutputStream;
