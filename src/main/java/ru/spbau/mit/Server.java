@@ -16,49 +16,29 @@ import java.util.logging.Logger;
  * SPBAU Java practice.
  */
 
-public class TorrentServer {
-    // TODO public?
-    public static final byte LIST_QUERY_ID = 1;
-    public static final byte UPLOAD_QUERY_ID = 2;
-    public static final byte SOURCES_QUERY_ID = 3;
-    public static final byte UPDATE_QUERY_ID = 4;
-    private static final int PORT_NUMBER = 8081;
-    private static final int MAX_FILES = 1073741824;
-    private static final int IP_ADDRESS_BYTE_COUNT = 4;
-    private static final long ACTIVE_SEED_TIME_MILLIS = 300000;
-    private static final String DEFAULT_DIRECTORY_STR = "./";
-    private static final String SAVE_FILES_FILE_NAME = "ServerData.ser";
-    private static final Logger LOG = Logger.getLogger(TorrentServer.class.getName());
-    private static final String WRONG_TYPE_OF_QUERY_MESSAGE = "Wrong type of query!";
-    private static final String CONNECTION_OVER_MESSAGE = "Connection is over!";
-    private static final String BAD_CONNECTION_MESSAGE = "Something went wrong with connection!";
-    private static final String BAD_IO_NEW_CONNECTIONS_MESSAGE = "Bad I/O while waiting for a connection!";
-    private static final String TOO_MANY_ARGS_MESSAGE = "To many arguments!";
-    private static final String NEW_SERVER_ERROR_MESSAGE = "Fail to create new server!";
-    private static final String STOP_SERVER_ERROR_MESSAGE = "Fail to stop server!";
-    private static final String FAIL_TO_LOAD_FILES_MESSAGE = "Fail to load files!";
-    private static final String FAIL_TO_SAVE_FILES_MESSAGE = "Fail to save files!";
+public class Server extends Consts {
+    private static final Logger LOG = Logger.getLogger(Server.class.getName());
 
-    private final java.io.File savingFile;
+    private final File savingFile;
     private final ServerSocket serverSocket;
     private final ExecutorService threadPool;
-    private final Map<Integer, File> files;
+    private final Map<Integer, FileMeta> files;
     private int idCounter;
 
-    public TorrentServer(String directoryStr) throws IOException {
-        savingFile = new java.io.File(directoryStr, SAVE_FILES_FILE_NAME);
+    public Server(String directoryStr) throws IOException {
+        savingFile = new File(directoryStr, SAVE_SERVER_DATA_FILE_NAME);
         if (savingFile.exists()) {
-            files = loadFiles();
+            files = loadData();
         } else {
-            files = new HashMap<Integer, File>();
+            files = new HashMap<Integer, FileMeta>();
         }
-        serverSocket = new ServerSocket(PORT_NUMBER);
+        serverSocket = new ServerSocket(SERVER_PORT_NUMBER);
         threadPool = Executors.newCachedThreadPool();
         idCounter = -1;
     }
 
     public static void main(String[] args) {
-        final TorrentServer server;
+        final Server server;
 
         if (args.length > 1) {
             LOG.warning(TOO_MANY_ARGS_MESSAGE);
@@ -67,9 +47,9 @@ public class TorrentServer {
 
         try {
             if (args.length == 0) {
-                server = new TorrentServer(DEFAULT_DIRECTORY_STR);
+                server = new Server(DEFAULT_DIRECTORY_STR);
             } else {
-                server = new TorrentServer(args[0]);
+                server = new Server(args[0]);
             }
 
             server.start();
@@ -93,25 +73,26 @@ public class TorrentServer {
     public void stop() throws IOException {
         threadPool.shutdown();
         serverSocket.close();
-        saveFiles();
+        saveData();
     }
 
-    private HashMap<Integer, File> loadFiles() {
-        HashMap<Integer, File> result;
+    @SuppressWarnings("unchecked")
+    private HashMap<Integer, FileMeta> loadData() {
+        HashMap<Integer, FileMeta> result;
         try {
             final FileInputStream fileInputStream = new FileInputStream(savingFile);
             final ObjectInputStream objectInputStream = new ObjectInputStream(fileInputStream);
-            result = (HashMap<Integer, File>) objectInputStream.readObject();
+            result = (HashMap<Integer, FileMeta>) objectInputStream.readObject();
             objectInputStream.close();
             fileInputStream.close();
         } catch (IOException | ClassNotFoundException e) {
             LOG.warning(FAIL_TO_LOAD_FILES_MESSAGE);
-            result = new HashMap<Integer, File>();
+            result = new HashMap<Integer, FileMeta>();
         }
         return result;
     }
 
-    private void saveFiles() {
+    private void saveData() {
         try {
             final FileOutputStream fileOutputStream = new FileOutputStream(savingFile);
             final ObjectOutputStream objectOutputStream = new ObjectOutputStream(fileOutputStream);
@@ -125,7 +106,7 @@ public class TorrentServer {
     }
 
     private void handleConnection(Socket socket) {
-        try (TorrentConnection connection = new TorrentConnection(socket)) {
+        try (Connection connection = new Connection(socket)) {
             while (true) {
                 switch (connection.readQueryId()) {
                     case LIST_QUERY_ID:
@@ -146,10 +127,10 @@ public class TorrentServer {
                 }
             }
         } catch (IOException e) {
-            LOG.warning(BAD_CONNECTION_MESSAGE);
+            if (!socket.isClosed()) {
+                LOG.warning(BAD_CONNECTION_MESSAGE);
+            }
         }
-
-        LOG.info(CONNECTION_OVER_MESSAGE);
     }
 
     private void run() {
@@ -158,32 +139,34 @@ public class TorrentServer {
                 final Socket socket = serverSocket.accept();
                 threadPool.submit(() -> handleConnection(socket));
             } catch (IOException e) {
-                LOG.warning(BAD_IO_NEW_CONNECTIONS_MESSAGE);
+                if (!serverSocket.isClosed()) {
+                    LOG.warning(BAD_IO_NEW_CONNECTIONS_MESSAGE);
+                }
                 break;
             }
         }
     }
 
-    private void doList(TorrentConnection connection) throws IOException {
+    private void doList(Connection connection) throws IOException {
         final DataInputStream dataInputStream = connection.getDataInputStream();
         final DataOutputStream dataOutputStream = connection.getDataOutputStream();
 
         synchronized (files) {
             dataOutputStream.writeInt(files.size());
 
-            for (Map.Entry<Integer, File> entry : files.entrySet()) {
+            for (Map.Entry<Integer, FileMeta> entry : files.entrySet()) {
                 dataOutputStream.writeInt(entry.getKey());
 
-                final File file = entry.getValue();
-                dataOutputStream.writeUTF(file.name);
-                dataOutputStream.writeLong(file.size);
+                final FileMeta fileMeta = entry.getValue();
+                dataOutputStream.writeUTF(fileMeta.name);
+                dataOutputStream.writeLong(fileMeta.size);
             }
 
             dataOutputStream.flush();
         }
     }
 
-    private void doUpload(TorrentConnection connection) throws IOException {
+    private void doUpload(Connection connection) throws IOException {
         final DataInputStream dataInputStream = connection.getDataInputStream();
         final DataOutputStream dataOutputStream = connection.getDataOutputStream();
 
@@ -196,14 +179,14 @@ public class TorrentServer {
                 idCounter = 0;
             }
 
-            files.put(idCounter, new File(name, size));
+            files.put(idCounter, new FileMeta(name, size));
 
             dataOutputStream.writeInt(idCounter);
             dataOutputStream.flush();
         }
     }
 
-    private void doSources(TorrentConnection connection) throws IOException {
+    private void doSources(Connection connection) throws IOException {
         final DataInputStream dataInputStream = connection.getDataInputStream();
         final DataOutputStream dataOutputStream = connection.getDataOutputStream();
 
@@ -211,32 +194,43 @@ public class TorrentServer {
 
         final Seeds seeds;
         synchronized (files) {
-            seeds = files.get(id).seeds;
+            final FileMeta fileMeta = files.get(id);
+            if (fileMeta != null) {
+                seeds = fileMeta.seeds;
+            } else {
+                seeds = null;
+            }
         }
 
-        synchronized (seeds) {
-            seeds.removeInactive();
+        if (seeds != null) {
+            synchronized (seeds) {
+                seeds.removeInactive();
 
-            dataOutputStream.writeInt(seeds.size());
+                dataOutputStream.writeInt(seeds.size());
 
-            for (Seed seed : seeds) {
-                for (int i = 0; i < IP_ADDRESS_BYTE_COUNT; i++) {
-                    dataOutputStream.writeByte(seed.ip[i]);
+                for (Seed seed : seeds) {
+                    for (int i = 0; i < IP_ADDRESS_BYTE_COUNT; i++) {
+                        dataOutputStream.writeByte(seed.ip[i]);
+                    }
+                    dataOutputStream.writeShort(seed.port);
                 }
-                dataOutputStream.writeShort(seed.port);
-            }
 
+                dataOutputStream.flush();
+            }
+        } else {
+            dataOutputStream.writeInt(0);
             dataOutputStream.flush();
         }
     }
 
-    private void doUpdate(TorrentConnection connection) throws IOException {
+    private void doUpdate(Connection connection) throws IOException {
         final DataInputStream dataInputStream = connection.getDataInputStream();
         final DataOutputStream dataOutputStream = connection.getDataOutputStream();
 
         try {
             final byte[] ip = connection.getSocket().getInetAddress().getAddress();
             final short port = dataInputStream.readShort();
+
             final int count = dataInputStream.readInt();
 
             for (int i = 0; i < count; i++) {
@@ -244,18 +238,25 @@ public class TorrentServer {
 
                 final Seeds seeds;
                 synchronized (files) {
-                    seeds = files.get(id).seeds;
+                    final FileMeta fileMeta = files.get(id);
+                    if (fileMeta != null) {
+                        seeds = fileMeta.seeds;
+                    } else {
+                        seeds = null;
+                    }
                 }
 
-                synchronized (seeds) {
-                    final Seed freshSeed = new Seed(ip, port);
-                    final Seed oldSeed = seeds.ceiling(freshSeed);
+                if (seeds != null) {
+                    synchronized (seeds) {
+                        final Seed freshSeed = new Seed(ip, port);
+                        final Seed oldSeed = seeds.ceiling(freshSeed);
 
-                    if (oldSeed == null || freshSeed.compareTo(oldSeed) != 0) {
-                        seeds.add(freshSeed);
-                        freshSeed.resetTime();
-                    } else {
-                        oldSeed.resetTime();
+                        if (oldSeed == null || freshSeed.compareTo(oldSeed) != 0) {
+                            seeds.add(freshSeed);
+                            freshSeed.resetTime();
+                        } else {
+                            oldSeed.resetTime();
+                        }
                     }
                 }
             }
@@ -269,12 +270,12 @@ public class TorrentServer {
         dataOutputStream.flush();
     }
 
-    private static class File implements Serializable {
+    private static class FileMeta implements Serializable {
         private final String name;
         private final long size;
         private final Seeds seeds;
 
-        public File(String name, long size) {
+        public FileMeta(String name, long size) {
             this.name = name;
             this.size = size;
             seeds = new Seeds();

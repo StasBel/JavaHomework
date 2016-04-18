@@ -10,12 +10,12 @@ import java.net.Socket;
  * SPBAU Java practice.
  */
 
-public class TorrentConnection implements AutoCloseable {
+public class Connection implements AutoCloseable {
     private final Socket socket;
     private final DataInputStream dataInputStream;
     private final DataOutputStream dataOutputStream;
 
-    public TorrentConnection(Socket socket) throws IOException {
+    public Connection(Socket socket) throws IOException {
         this.socket = socket;
         dataInputStream = new DataInputStream(socket.getInputStream());
         dataOutputStream = new DataOutputStream(socket.getOutputStream());
@@ -29,8 +29,16 @@ public class TorrentConnection implements AutoCloseable {
         socket.close();
     }
 
+    public boolean isConnected() {
+        return socket.isConnected();
+    }
+
     public Socket getSocket() {
         return socket;
+    }
+
+    public int getPort() {
+        return socket.getPort();
     }
 
     public DataInputStream getDataInputStream() {
