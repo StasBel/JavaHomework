@@ -1,14 +1,14 @@
 package ru.spbau.mit;
 
-import org.apache.commons.io.IOUtils;
-
 import java.io.*;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.UnknownHostException;
-import java.nio.channels.Channels;
-import java.util.*;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.logging.Logger;
@@ -159,6 +159,7 @@ public class Client extends Consts {
             if (size % BLOCK_SIZE > 0) {
                 numberOfParts++;
             }
+
             for (int index = 0; index < numberOfParts; index++) {
                 parts.add(index);
             }
@@ -166,6 +167,8 @@ public class Client extends Consts {
             synchronized (files) {
                 files.put(uploadAnswer.id, new FileMeta(directoryStr, pathString, parts));
             }
+
+            executeUpdate();
         }
     }
 
@@ -211,6 +214,30 @@ public class Client extends Consts {
         }
     }
 
+    public ListAnswer executeList() throws IOException {
+        if (serverConnection != null && serverConnection.isConnected()) {
+            final DataInputStream dataInputStream = serverConnection.getDataInputStream();
+            final DataOutputStream dataOutputStream = serverConnection.getDataOutputStream();
+
+            dataOutputStream.writeByte(LIST_QUERY_ID);
+            dataOutputStream.flush();
+
+            final int count = dataInputStream.readInt();
+            final Map<Integer, ListFile> files = new HashMap<>();
+            for (int index = 0; index < count; index++) {
+                final int id = dataInputStream.readInt();
+                final String name = dataInputStream.readUTF();
+                final long size = dataInputStream.readLong();
+
+                files.put(id, new ListFile(name, size));
+            }
+
+            return new ListAnswer(count, files);
+        } else {
+            return null;
+        }
+    }
+
     private Connection connectToSeed(byte[] ip, short port) throws UnknownHostException, IOException {
         return new Connection(new Socket(InetAddress.getByAddress(ip), port));
     }
@@ -253,33 +280,14 @@ public class Client extends Consts {
 
             final RandomAccessFile file = fileMeta.file;
             synchronized (file) {
-                file.seek(part * BLOCK_SIZE);
-                IOUtils.copy(dataInputStream, Channels.newOutputStream(file.getChannel()));
+                final int length = dataInputStream.readInt();
+                if (length > 0) {
+                    final byte[] bytes = new byte[length];
+                    dataInputStream.readFully(bytes);
+                    file.seek(part * BLOCK_SIZE);
+                    file.write(bytes);
+                }
             }
-        }
-    }
-
-    public ListAnswer executeList() throws IOException {
-        if (serverConnection != null && serverConnection.isConnected()) {
-            final DataInputStream dataInputStream = serverConnection.getDataInputStream();
-            final DataOutputStream dataOutputStream = serverConnection.getDataOutputStream();
-
-            dataOutputStream.writeByte(LIST_QUERY_ID);
-            dataOutputStream.flush();
-
-            final int count = dataInputStream.readInt();
-            final Map<Integer, ListFile> files = new HashMap<>();
-            for (int index = 0; index < count; index++) {
-                final int id = dataInputStream.readInt();
-                final String name = dataInputStream.readUTF();
-                final long size = dataInputStream.readLong();
-
-                files.put(id, new ListFile(name, size));
-            }
-
-            return new ListAnswer(count, files);
-        } else {
-            return null;
         }
     }
 
@@ -311,10 +319,10 @@ public class Client extends Consts {
             dataOutputStream.flush();
 
             final int size = dataInputStream.readInt();
-            final Set<SourcesSeed> seeds = new TreeSet<>();
+            final Set<SourcesSeed> seeds = new HashSet<>();
             for (int index = 0; index < size; index++) {
                 final byte[] ip = new byte[IP_ADDRESS_BYTE_COUNT];
-                for (int jndex = 0; index < IP_ADDRESS_BYTE_COUNT; jndex++) {
+                for (int jndex = 0; jndex < IP_ADDRESS_BYTE_COUNT; jndex++) {
                     ip[jndex] = dataInputStream.readByte();
                 }
                 final short port = dataInputStream.readShort();
@@ -465,7 +473,10 @@ public class Client extends Consts {
         if (file != null) {
             synchronized (file) {
                 file.seek(part * BLOCK_SIZE);
-                IOUtils.copy(Channels.newInputStream(file.getChannel()), dataOutputStream);
+                final byte[] bytes = new byte[(int) BLOCK_SIZE];
+                final int length = file.read(bytes);
+                dataOutputStream.writeInt(length);
+                dataOutputStream.write(bytes);
                 dataOutputStream.flush();
             }
         } else {
@@ -484,13 +495,21 @@ public class Client extends Consts {
         }
     }
 
-    private static class ListFile {
+    public static class ListFile {
         private final String name;
         private final long size;
 
         public ListFile(String name, long size) {
             this.name = name;
             this.size = size;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public long getSize() {
+            return size;
         }
     }
 
