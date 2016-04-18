@@ -12,6 +12,7 @@ dependencies {
     testCompile group: 'junit', name: 'junit', version: '4.12'
     testCompile group: 'com.google.guava', name: 'guava', version: '19.0'
     compile group: 'commons-io', name: 'commons-io', version: '2.4'
+    compile group: 'junit-addons', name: 'junit-addons', version: '1.4'
 }
 
 checkstyle {

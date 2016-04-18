@@ -1,5 +1,6 @@
 package ru.spbau.mit;
 
+import junitx.framework.FileAssert;
 import org.junit.Test;
 
 import java.io.File;
@@ -86,10 +87,7 @@ public class TorrentTest {
     public void testDownload() throws UnknownHostException, IOException {
         clearSaves(DEFAULT_DIRECTORY_STR);
         clearSaves(LEECH_CLIENT_DIRECTORY_STR);
-        final File file = new File(LEECH_CLIENT_DIRECTORY_STR, FILE_1_NAME);
-        if (file.exists()) {
-            file.delete();
-        }
+        deleteFileIfExists(LEECH_CLIENT_DIRECTORY_STR, FILE_1_NAME);
 
         final Server server = new Server(DEFAULT_DIRECTORY_STR);
         server.start();
@@ -110,6 +108,10 @@ public class TorrentTest {
         final int id = listAnswer.getFiles().keySet().iterator().next();
         final Set<Integer> parts = new HashSet<>(Arrays.asList(0));
         client2.downloadFile(id, parts);
+        FileAssert.assertEquals("File1.txt equality",
+                new File(DEFAULT_DIRECTORY_STR, FILE_1_NAME),
+                new File(LEECH_CLIENT_DIRECTORY_STR, FILE_1_NAME)
+        );
         client2.disconnectFromServer();
 
         client2.stop();
@@ -117,6 +119,13 @@ public class TorrentTest {
         client1.stop();
 
         server.stop();
+    }
+
+    private void deleteFileIfExists(String directoryString, String fileName) {
+        final File file = new File(directoryString, fileName);
+        if (file.exists()) {
+            file.delete();
+        }
     }
 
     private void clearSaves(String directoryString) {
