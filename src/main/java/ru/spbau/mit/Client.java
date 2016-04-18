@@ -47,6 +47,84 @@ public class Client extends Consts {
         serverConnection = null;
     }
 
+    // args pattern: (ip:String) (port:int) actions;
+    // actions: (list / commit (path:String) / download (id:int) (part:int)^*)
+    public static void main(String[] args) {
+        if (args.length < MIN_ARGS_NUMBER_CLIENT_MAIN) {
+            LOG.warning(NOT_ENOUGH_ARGS_MESSAGE);
+            System.exit(1);
+        }
+
+        class InvalidArgumentsException extends Exception {
+        }
+
+        int index = 0;
+        try {
+            final Client client = new Client(Integer.valueOf(args[0]), args[1], DEFAULT_DIRECTORY_STR);
+            client.start();
+            client.connectToServer();
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                try {
+                    client.disconnectFromServer();
+                    client.stop();
+                } catch (IOException e) {
+                    LOG.warning(STOP_CLIENT_ERROR_MESSAGE);
+                }
+            }));
+            index = 2;
+
+            while (index < args.length) {
+                switch (args[index]) {
+                    case "list":
+                        final ListAnswer listAnswer = client.executeList();
+                        System.out.println(listAnswer.count);
+                        for (ListFile listFile : listAnswer.files.values()) {
+                            System.out.println(listFile.name + " " + listAnswer.files);
+                        }
+                        index++;
+                        break;
+                    case "commit":
+                        index++;
+                        if (index >= args.length) {
+                            throw new InvalidArgumentsException();
+                        }
+                        final String pathString = args[index];
+                        client.commitFile(pathString);
+                        index++;
+                        break;
+                    case "download":
+                        index++;
+                        if (index >= args.length) {
+                            throw new InvalidArgumentsException();
+                        }
+                        final int id = Integer.valueOf(args[index]);
+                        index++;
+                        if (index >= args.length) {
+                            throw new InvalidArgumentsException();
+                        }
+                        try {
+                            final Set<Integer> parts = new HashSet<>();
+                            while (index < args.length) {
+                                parts.add(Integer.valueOf(args[index]));
+                                index++;
+                            }
+                            client.downloadFile(id, parts);
+                        } catch (NumberFormatException e) {
+                            break;
+                        }
+                        index++;
+                        break;
+                    default:
+                        throw new InvalidArgumentsException();
+                }
+            }
+        } catch (IOException e) {
+            LOG.warning(NEW_CLIENT_ERROR_MESSAGE);
+        } catch (InvalidArgumentsException e) {
+            LOG.warning(INVALID_ARGS_MESSAGE);
+        }
+    }
+
     public void start() {
         threadPool.submit(this::run);
     }
@@ -71,7 +149,7 @@ public class Client extends Consts {
     }
 
     public void commitFile(String pathString) throws IOException {
-        final File file = new File(pathString);
+        final File file = new File(directoryStr, pathString);
         if (file.exists()) {
             final long size = file.length();
             final UploadAnswer uploadAnswer = executeUpload(file.getName(), size);
@@ -86,7 +164,7 @@ public class Client extends Consts {
             }
 
             synchronized (files) {
-                files.put(uploadAnswer.id, new FileMeta(pathString, parts));
+                files.put(uploadAnswer.id, new FileMeta(directoryStr, pathString, parts));
             }
         }
     }
@@ -110,13 +188,78 @@ public class Client extends Consts {
                 name = listFile.name;
                 size = listFile.size;
             }
-            fileMeta = new FileMeta(directoryStr + File.separator + name, new HashSet<>());
+            fileMeta = new FileMeta(directoryStr, name, new HashSet<>());
         }
 
         final SourcesAnswer sourcesAnswer = executeSources(id);
+        for (SourcesSeed seed : sourcesAnswer.seeds) {
+            final Connection connection = connectToSeed(seed.ip, seed.port);
+
+            final StatAnswer statAnswer = executeStat(connection, id);
+            for (int part : statAnswer.parts) {
+                if (parts.contains(part)) {
+                    executeGet(connection, id, part, fileMeta);
+                    parts.remove(part);
+                }
+            }
+
+            disconnectFromSeed(connection);
+        }
+
+        if (parts.size() != 0) {
+            LOG.info(NOT_ALL_PARTS_DOWNLOADED_MESSAGE);
+        }
     }
 
-    private ListAnswer executeList() throws IOException {
+    private Connection connectToSeed(byte[] ip, short port) throws UnknownHostException, IOException {
+        return new Connection(new Socket(InetAddress.getByAddress(ip), port));
+    }
+
+    private void disconnectFromSeed(Connection connection) throws IOException {
+        connection.close();
+    }
+
+    private StatAnswer executeStat(Connection connection, int id) throws IOException {
+        if (connection != null && connection.isConnected()) {
+            final DataInputStream dataInputStream = connection.getDataInputStream();
+            final DataOutputStream dataOutputStream = connection.getDataOutputStream();
+
+            dataOutputStream.writeByte(STAT_QUERY_ID);
+            dataOutputStream.writeInt(id);
+            dataOutputStream.flush();
+
+            final int count = dataInputStream.readInt();
+            final Set<Integer> parts = new HashSet<>();
+            for (int index = 0; index < count; index++) {
+                final int part = dataInputStream.readInt();
+                parts.add(part);
+            }
+
+            return new StatAnswer(count, parts);
+        } else {
+            return null;
+        }
+    }
+
+    private void executeGet(Connection connection, int id, int part, FileMeta fileMeta) throws IOException {
+        if (connection != null && connection.isConnected()) {
+            final DataInputStream dataInputStream = connection.getDataInputStream();
+            final DataOutputStream dataOutputStream = connection.getDataOutputStream();
+
+            dataOutputStream.writeByte(GET_QUERY_ID);
+            dataOutputStream.writeInt(id);
+            dataOutputStream.writeInt(part);
+            dataOutputStream.flush();
+
+            final RandomAccessFile file = fileMeta.file;
+            synchronized (file) {
+                file.seek(part * BLOCK_SIZE);
+                IOUtils.copy(dataInputStream, Channels.newOutputStream(file.getChannel()));
+            }
+        }
+    }
+
+    public ListAnswer executeList() throws IOException {
         if (serverConnection != null && serverConnection.isConnected()) {
             final DataInputStream dataInputStream = serverConnection.getDataInputStream();
             final DataOutputStream dataOutputStream = serverConnection.getDataOutputStream();
@@ -331,6 +474,16 @@ public class Client extends Consts {
         }
     }
 
+    private static class StatAnswer {
+        private final int count;
+        private final Set<Integer> parts;
+
+        public StatAnswer(int count, Set<Integer> parts) {
+            this.count = count;
+            this.parts = parts;
+        }
+    }
+
     private static class ListFile {
         private final String name;
         private final long size;
@@ -349,9 +502,17 @@ public class Client extends Consts {
             this.count = count;
             this.files = files;
         }
+
+        public int getCount() {
+            return count;
+        }
+
+        public Map<Integer, ListFile> getFiles() {
+            return files;
+        }
     }
 
-    public static class UploadAnswer {
+    private static class UploadAnswer {
         private final int id;
 
         public UploadAnswer(int id) {
@@ -369,7 +530,7 @@ public class Client extends Consts {
         }
     }
 
-    public static class SourcesAnswer {
+    private static class SourcesAnswer {
         private final int size;
         private final Set<SourcesSeed> seeds;
 
@@ -379,7 +540,7 @@ public class Client extends Consts {
         }
     }
 
-    public static class UpdateAnswer {
+    private static class UpdateAnswer {
         private final boolean status;
 
         public UpdateAnswer(boolean status) {
@@ -391,18 +552,20 @@ public class Client extends Consts {
         private static final String OPEN_MODE = "rw";
 
         private final Set<Integer> parts;
+        private final String directoryStr;
         private final String pathString;
         private transient RandomAccessFile file;
 
-        public FileMeta(String pathString, Set<Integer> parts) throws FileNotFoundException {
+        public FileMeta(String directoryStr, String pathString, Set<Integer> parts) throws FileNotFoundException {
             this.parts = parts;
+            this.directoryStr = directoryStr;
             this.pathString = pathString;
-            file = new RandomAccessFile(new File(pathString), OPEN_MODE);
+            file = new RandomAccessFile(new File(directoryStr, pathString), OPEN_MODE);
         }
 
         private void readObject(ObjectInputStream objectInputStream) throws IOException, ClassNotFoundException {
             objectInputStream.defaultReadObject();
-            file = new RandomAccessFile(new File(pathString), OPEN_MODE);
+            file = new RandomAccessFile(new File(directoryStr, pathString), OPEN_MODE);
         }
     }
 }

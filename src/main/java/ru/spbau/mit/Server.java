@@ -209,8 +209,8 @@ public class Server extends Consts {
                 dataOutputStream.writeInt(seeds.size());
 
                 for (Seed seed : seeds) {
-                    for (int i = 0; i < IP_ADDRESS_BYTE_COUNT; i++) {
-                        dataOutputStream.writeByte(seed.ip[i]);
+                    for (int index = 0; index < IP_ADDRESS_BYTE_COUNT; index++) {
+                        dataOutputStream.writeByte(seed.ip[index]);
                     }
                     dataOutputStream.writeShort(seed.port);
                 }
@@ -233,7 +233,7 @@ public class Server extends Consts {
 
             final int count = dataInputStream.readInt();
 
-            for (int i = 0; i < count; i++) {
+            for (int index = 0; index < count; index++) {
                 final int id = dataInputStream.readInt();
 
                 final Seeds seeds;
@@ -247,6 +247,7 @@ public class Server extends Consts {
                 }
 
                 if (seeds != null) {
+
                     synchronized (seeds) {
                         final Seed freshSeed = new Seed(ip, port);
                         final Seed oldSeed = seeds.ceiling(freshSeed);
@@ -302,6 +303,7 @@ public class Server extends Consts {
         public Seed(byte[] ip, short port) {
             this.ip = ip;
             this.port = port;
+            lastTime = new Long(0);
         }
 
         @Override
