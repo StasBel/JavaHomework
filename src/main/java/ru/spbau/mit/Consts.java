@@ -14,7 +14,8 @@ public class Consts {
     protected static final byte GET_QUERY_ID = 2;
     protected static final int SERVER_PORT_NUMBER = 8081;
     protected static final int MAX_FILES = 1073741824;
-    protected static final long BLOCK_SIZE = 10485760;
+    protected static final long BLOCK_SIZE = 10000000;
+    protected static final int BUFF_SIZE = 4096;
     protected static final int IP_ADDRESS_BYTE_COUNT = 4;
     protected static final long ACTIVE_SEED_TIME_MILLIS = 300000;
     protected static final int MIN_ARGS_NUMBER_CLIENT_MAIN = 3;
@@ -35,7 +36,8 @@ public class Consts {
     protected static final String FAIL_TO_LOAD_FILES_MESSAGE = "Fail to load files!";
     protected static final String FAIL_TO_SAVE_FILES_MESSAGE = "Fail to save files!";
     protected static final String NO_SUCH_FILE_MESSAGE = "No such file!";
-    protected static final String NOT_ALL_PARTS_DOWNLOADED_MESSAGE = "Not all parts downloaded";
+    protected static final String NOT_ALL_PARTS_DOWNLOADED_MESSAGE = "Not all parts downloaded!";
+    protected static final String NO_SUCH_PART_IN_THIS_FILE = "No such part in this file!";
 
     protected Consts() {
     }

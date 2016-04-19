@@ -79,7 +79,7 @@ public class Client extends Consts {
                         final ListAnswer listAnswer = client.executeList();
                         System.out.println(listAnswer.count);
                         for (ListFile listFile : listAnswer.files.values()) {
-                            System.out.println(listFile.name + " " + listAnswer.files);
+                            System.out.println(listFile.name + " " + listFile.size);
                         }
                         index++;
                         break;
@@ -151,67 +151,60 @@ public class Client extends Consts {
     public void commitFile(String pathString) throws IOException {
         final File file = new File(directoryStr, pathString);
         if (file.exists()) {
+            final String name = file.getName();
             final long size = file.length();
-            final UploadAnswer uploadAnswer = executeUpload(file.getName(), size);
+            final UploadAnswer uploadAnswer = executeUpload(name, size);
 
             final Set<Integer> parts = new HashSet<>();
-            int numberOfParts = (int) (size / BLOCK_SIZE);
-            if (size % BLOCK_SIZE > 0) {
-                numberOfParts++;
-            }
-
+            final int numberOfParts = getNumberOfParts(size);
             for (int index = 0; index < numberOfParts; index++) {
                 parts.add(index);
             }
 
             synchronized (files) {
-                files.put(uploadAnswer.id, new FileMeta(directoryStr, pathString, parts));
+                files.put(uploadAnswer.id, new FileMeta(directoryStr, pathString, name, size, parts));
             }
 
             executeUpdate();
         }
     }
 
-    public void downloadFile(int id, Set<Integer> parts) throws IOException {
-        FileMeta fileMeta;
-
-        synchronized (files) {
-            fileMeta = files.get(id);
-        }
-
-        final String name;
-        final long size;
+    public void downloadFile(int id) throws IOException {
+        final FileMeta fileMeta = getFileMeta(id);
         if (fileMeta == null) {
-            final ListAnswer listAnswer = executeList();
-            final ListFile listFile = listAnswer.files.get(id);
-            if (listFile == null) {
-                LOG.info(NO_SUCH_FILE_MESSAGE);
-                return;
-            } else {
-                name = listFile.name;
-                size = listFile.size;
+            LOG.info(NO_SUCH_FILE_MESSAGE);
+            return;
+        }
+        final String name = fileMeta.name;
+        final long size = fileMeta.size;
+
+        final Set<Integer> parts = new HashSet<>();
+        final int numberOfParts = getNumberOfParts(size);
+        for (int index = 0; index < numberOfParts; index++) {
+            parts.add(index);
+        }
+
+        downloading(id, parts, fileMeta);
+    }
+
+    public void downloadFile(int id, Set<Integer> parts) throws IOException {
+        final FileMeta fileMeta = getFileMeta(id);
+        if (fileMeta == null) {
+            LOG.info(NO_SUCH_FILE_MESSAGE);
+            return;
+        }
+        final String name = fileMeta.name;
+        final long size = fileMeta.size;
+
+        final int numberOfParts = getNumberOfParts(size);
+        for (int part : parts) {
+            if (part >= numberOfParts) {
+                parts.remove(part);
+                LOG.info(NO_SUCH_PART_IN_THIS_FILE);
             }
-            fileMeta = new FileMeta(directoryStr, name, new HashSet<>());
         }
 
-        final SourcesAnswer sourcesAnswer = executeSources(id);
-        for (SourcesSeed seed : sourcesAnswer.seeds) {
-            final Connection connection = connectToSeed(seed.ip, seed.port);
-
-            final StatAnswer statAnswer = executeStat(connection, id);
-            for (int part : statAnswer.parts) {
-                if (parts.contains(part)) {
-                    executeGet(connection, id, part, fileMeta);
-                    parts.remove(part);
-                }
-            }
-
-            disconnectFromSeed(connection);
-        }
-
-        if (parts.size() != 0) {
-            LOG.info(NOT_ALL_PARTS_DOWNLOADED_MESSAGE);
-        }
+        downloading(id, parts, fileMeta);
     }
 
     public ListAnswer executeList() throws IOException {
@@ -236,6 +229,56 @@ public class Client extends Consts {
         } else {
             return null;
         }
+    }
+
+    private int getNumberOfParts(long size) {
+        int numberOfParts = (int) (size / BLOCK_SIZE);
+        if (size % BLOCK_SIZE > 0) {
+            numberOfParts++;
+        }
+        return numberOfParts;
+    }
+
+    private FileMeta getFileMeta(int id) throws IOException {
+        FileMeta fileMeta;
+
+        synchronized (files) {
+            fileMeta = files.get(id);
+        }
+
+        if (fileMeta == null) {
+            final ListAnswer listAnswer = executeList();
+            final ListFile listFile = listAnswer.files.get(id);
+            if (listFile == null) {
+                return null;
+            }
+            fileMeta = new FileMeta(directoryStr, listFile.name, listFile.name, listFile.size, new HashSet<>());
+        }
+
+        return fileMeta;
+    }
+
+    private void downloading(int id, Set<Integer> parts, FileMeta fileMeta) throws IOException {
+        final SourcesAnswer sourcesAnswer = executeSources(id);
+        for (SourcesSeed seed : sourcesAnswer.seeds) {
+            final Connection connection = connectToSeed(seed.ip, seed.port);
+
+            final StatAnswer statAnswer = executeStat(connection, id);
+            for (int part : statAnswer.parts) {
+                if (parts.contains(part)) {
+                    executeGet(connection, id, part, fileMeta);
+                    parts.remove(part);
+                }
+            }
+
+            disconnectFromSeed(connection);
+        }
+
+        if (parts.size() != 0) {
+            LOG.info(NOT_ALL_PARTS_DOWNLOADED_MESSAGE);
+        }
+
+        executeUpdate();
     }
 
     private Connection connectToSeed(byte[] ip, short port) throws UnknownHostException, IOException {
@@ -280,13 +323,19 @@ public class Client extends Consts {
 
             final RandomAccessFile file = fileMeta.file;
             synchronized (file) {
-                final int length = dataInputStream.readInt();
-                if (length > 0) {
-                    final byte[] bytes = new byte[length];
+                file.seek(part * BLOCK_SIZE);
+                int length = dataInputStream.readInt();
+                while (length > 0) {
+                    final int thisTime = Math.min(length, BUFF_SIZE);
+                    final byte[] bytes = new byte[thisTime];
                     dataInputStream.readFully(bytes);
-                    file.seek(part * BLOCK_SIZE);
                     file.write(bytes);
+                    length -= thisTime;
                 }
+            }
+
+            synchronized (fileMeta.parts) {
+                fileMeta.parts.add(part);
             }
         }
     }
@@ -461,22 +510,31 @@ public class Client extends Consts {
         final int part = dataInputStream.readInt();
 
         final RandomAccessFile file;
+        final long size;
         synchronized (files) {
             final FileMeta outerFileMeta = files.get(id);
             if (outerFileMeta != null) {
                 file = outerFileMeta.file;
+                size = outerFileMeta.size;
             } else {
                 file = null;
+                size = 0;
             }
         }
 
         if (file != null) {
             synchronized (file) {
                 file.seek(part * BLOCK_SIZE);
-                final byte[] bytes = new byte[(int) BLOCK_SIZE];
-                final int length = file.read(bytes);
+                int length = (int) Math.min(size - file.getFilePointer(), BLOCK_SIZE);
                 dataOutputStream.writeInt(length);
-                dataOutputStream.write(bytes);
+                while (length > 0) {
+                    final int thisTime = Math.min(length, BUFF_SIZE);
+                    final byte[] bytes = new byte[thisTime];
+                    file.readFully(bytes);
+                    dataOutputStream.write(bytes);
+                    length -= thisTime;
+                }
+
                 dataOutputStream.flush();
             }
         } else {
@@ -570,15 +628,20 @@ public class Client extends Consts {
     private static class FileMeta implements Serializable {
         private static final String OPEN_MODE = "rw";
 
-        private final Set<Integer> parts;
         private final String directoryStr;
         private final String pathString;
+        private final String name;
+        private final long size;
+        private final Set<Integer> parts;
         private transient RandomAccessFile file;
 
-        public FileMeta(String directoryStr, String pathString, Set<Integer> parts) throws FileNotFoundException {
-            this.parts = parts;
+        public FileMeta(String directoryStr, String pathString, String name,
+                        long size, Set<Integer> parts) throws FileNotFoundException {
             this.directoryStr = directoryStr;
             this.pathString = pathString;
+            this.name = name;
+            this.size = size;
+            this.parts = parts;
             file = new RandomAccessFile(new File(directoryStr, pathString), OPEN_MODE);
         }
 
