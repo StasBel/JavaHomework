@@ -21,13 +21,14 @@ import java.util.logging.Logger;
 public class Client extends Consts {
     private static final Logger LOG = Logger.getLogger(Client.class.getName());
 
+    protected final Map<Integer, FileMeta> files;
+
     private final int portNumber;
     private final String ipAddress;
     private final String directoryStr;
     private final File savingFile;
     private final ServerSocket serverSocket;
     private final ExecutorService threadPool;
-    private final Map<Integer, FileMeta> files;
     private Connection serverConnection;
 
     public Client(int portNumber, String ipAddress, String directoryStr) throws IOException {
