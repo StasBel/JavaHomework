@@ -38,6 +38,14 @@ public class TorrentTest {
     private static final int TEST_DOWNLOAD_NUMBER_OF_FILES = 3;
     private static final int TEST_SERIALIZATION_NUMBER_OF_FILES = 1;
 
+    public static void main(String[] args) {
+        clearSaves();
+
+        Server.main(new String[]{DEFAULT_DIRECTORY_STR});
+
+        ClientUI.main(new String[]{String.valueOf(PORT_NUMBER_1), IP_ADDRESS_1, SEED_CLIENT_DIRECTORY_STR});
+    }
+
     @Test
     public void testListAndCommit() throws UnknownHostException, IOException {
         clearSaves(DEFAULT_DIRECTORY_STR);
@@ -225,20 +233,40 @@ public class TorrentTest {
         server.stop();
     }
 
-    private void deleteFileIfExists(String directoryString, String fileName) {
-        final File file = new File(directoryString, fileName);
-        if (file.exists()) {
-            file.delete();
-        }
+    @Test
+    public void testUi() throws IOException {
+        clearSaves();
+
+        final Server server = new Server(DEFAULT_DIRECTORY_STR);
+        server.start();
+
+        final ClientUI clientUI = new ClientUI(PORT_NUMBER_1, IP_ADDRESS_1, SEED_CLIENT_DIRECTORY_STR);
+        clientUI.start();
+
+        clientUI.connectToServer();
+
+        clientUI.commitFile(FILE_1_NAME);
+        clientUI.commitFile(FILE_2_NAME);
+        clientUI.commitFile(FILE_3_NAME);
+
+        clientUI.updateTable();
+
+        watchForAWhile();
+
+        clientUI.disconnectFromServer();
+
+        clientUI.stop();
+
+        server.stop();
     }
 
-    private void clearSaves() {
+    private static void clearSaves() {
         clearSaves(DEFAULT_DIRECTORY_STR);
         clearSaves(SEED_CLIENT_DIRECTORY_STR);
         clearSaves(LEECH_CLIENT_DIRECTORY_STR);
     }
 
-    private void clearSaves(String directoryString) {
+    private static void clearSaves(String directoryString) {
         File folder = new File(directoryString);
         File[] fileList = folder.listFiles();
 
@@ -246,6 +274,21 @@ public class TorrentTest {
             if (file.getName().endsWith(".ser")) {
                 file.delete();
             }
+        }
+    }
+
+    private void watchForAWhile() {
+        try {
+            Thread.sleep(5000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void deleteFileIfExists(String directoryString, String fileName) {
+        final File file = new File(directoryString, fileName);
+        if (file.exists()) {
+            file.delete();
         }
     }
 }

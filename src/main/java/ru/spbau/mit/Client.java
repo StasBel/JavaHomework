@@ -22,10 +22,9 @@ public class Client extends Consts {
     private static final Logger LOG = Logger.getLogger(Client.class.getName());
 
     protected final Map<Integer, FileMeta> files;
-
+    protected final String directoryStr;
     private final int portNumber;
     private final String ipAddress;
-    private final String directoryStr;
     private final File savingFile;
     private final ServerSocket serverSocket;
     private final ExecutorService threadPool;
@@ -151,6 +150,7 @@ public class Client extends Consts {
 
     public void commitFile(String pathString) throws IOException {
         final File file = new File(directoryStr, pathString);
+
         if (file.exists()) {
             final String name = file.getName();
             final long size = file.length();
@@ -260,6 +260,10 @@ public class Client extends Consts {
     }
 
     private void downloading(int id, Set<Integer> parts, FileMeta fileMeta) throws IOException {
+        synchronized (fileMeta) {
+            fileMeta.isDownloading = true;
+        }
+
         final SourcesAnswer sourcesAnswer = executeSources(id);
         for (SourcesSeed seed : sourcesAnswer.seeds) {
             final Connection connection = connectToSeed(seed.ip, seed.port);
@@ -273,6 +277,10 @@ public class Client extends Consts {
             }
 
             disconnectFromSeed(connection);
+        }
+
+        synchronized (fileMeta) {
+            fileMeta.isDownloading = false;
         }
 
         if (parts.size() != 0) {
@@ -626,7 +634,7 @@ public class Client extends Consts {
         }
     }
 
-    private static class FileMeta implements Serializable {
+    protected static class FileMeta implements Serializable {
         private static final String OPEN_MODE = "rw";
 
         private final String directoryStr;
@@ -634,6 +642,7 @@ public class Client extends Consts {
         private final String name;
         private final long size;
         private final Set<Integer> parts;
+        private boolean isDownloading;
         private transient RandomAccessFile file;
 
         public FileMeta(String directoryStr, String pathString, String name,
@@ -644,6 +653,19 @@ public class Client extends Consts {
             this.size = size;
             this.parts = parts;
             file = new RandomAccessFile(new File(directoryStr, pathString), OPEN_MODE);
+            isDownloading = false;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public long getSize() {
+            return size;
+        }
+
+        public boolean isDownloading() {
+            return isDownloading;
         }
 
         private void readObject(ObjectInputStream objectInputStream) throws IOException, ClassNotFoundException {
