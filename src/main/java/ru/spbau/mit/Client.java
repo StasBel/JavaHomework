@@ -151,23 +151,11 @@ public class Client extends Consts {
     public void commitFile(String pathString) throws IOException {
         final File file = new File(directoryStr, pathString);
 
-        if (file.exists()) {
-            final String name = file.getName();
-            final long size = file.length();
-            final UploadAnswer uploadAnswer = executeUpload(name, size);
+        committing(file);
+    }
 
-            final Set<Integer> parts = new HashSet<>();
-            final int numberOfParts = getNumberOfParts(size);
-            for (int index = 0; index < numberOfParts; index++) {
-                parts.add(index);
-            }
-
-            synchronized (files) {
-                files.put(uploadAnswer.id, new FileMeta(directoryStr, pathString, name, size, parts));
-            }
-
-            executeUpdate();
-        }
+    public void commitFile(File file) throws IOException {
+        committing(file);
     }
 
     public void downloadFile(int id) throws IOException {
@@ -232,7 +220,27 @@ public class Client extends Consts {
         }
     }
 
-    private int getNumberOfParts(long size) {
+    private void committing(File file) throws IOException {
+        if (file.exists()) {
+            final String name = file.getName();
+            final long size = file.length();
+            final UploadAnswer uploadAnswer = executeUpload(name, size);
+
+            final Set<Integer> parts = new HashSet<>();
+            final int numberOfParts = getNumberOfParts(size);
+            for (int index = 0; index < numberOfParts; index++) {
+                parts.add(index);
+            }
+
+            synchronized (files) {
+                files.put(uploadAnswer.id, new FileMeta(file.getPath(), name, size, parts));
+            }
+
+            executeUpdate();
+        }
+    }
+
+    protected int getNumberOfParts(long size) {
         int numberOfParts = (int) (size / BLOCK_SIZE);
         if (size % BLOCK_SIZE > 0) {
             numberOfParts++;
@@ -253,7 +261,7 @@ public class Client extends Consts {
             if (listFile == null) {
                 return null;
             }
-            fileMeta = new FileMeta(directoryStr, listFile.name, listFile.name, listFile.size, new HashSet<>());
+            fileMeta = new FileMeta(directoryStr + listFile.name, listFile.name, listFile.size, new HashSet<>());
         }
 
         return fileMeta;
@@ -637,7 +645,6 @@ public class Client extends Consts {
     protected static class FileMeta implements Serializable {
         private static final String OPEN_MODE = "rw";
 
-        private final String directoryStr;
         private final String pathString;
         private final String name;
         private final long size;
@@ -645,14 +652,13 @@ public class Client extends Consts {
         private boolean isDownloading;
         private transient RandomAccessFile file;
 
-        public FileMeta(String directoryStr, String pathString, String name,
+        public FileMeta(String pathString, String name,
                         long size, Set<Integer> parts) throws FileNotFoundException {
-            this.directoryStr = directoryStr;
             this.pathString = pathString;
             this.name = name;
             this.size = size;
             this.parts = parts;
-            file = new RandomAccessFile(new File(directoryStr, pathString), OPEN_MODE);
+            file = new RandomAccessFile(new File(pathString), OPEN_MODE);
             isDownloading = false;
         }
 
@@ -664,13 +670,17 @@ public class Client extends Consts {
             return size;
         }
 
+        public Set<Integer> getParts() {
+            return parts;
+        }
+
         public boolean isDownloading() {
             return isDownloading;
         }
 
         private void readObject(ObjectInputStream objectInputStream) throws IOException, ClassNotFoundException {
             objectInputStream.defaultReadObject();
-            file = new RandomAccessFile(new File(directoryStr, pathString), OPEN_MODE);
+            file = new RandomAccessFile(new File(pathString), OPEN_MODE);
         }
     }
 }

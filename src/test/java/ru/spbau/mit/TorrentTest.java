@@ -39,7 +39,7 @@ public class TorrentTest {
     private static final int TEST_SERIALIZATION_NUMBER_OF_FILES = 1;
 
     public static void main(String[] args) {
-        clearSaves();
+        // clearSaves();
 
         Server.main(new String[]{DEFAULT_DIRECTORY_STR});
 

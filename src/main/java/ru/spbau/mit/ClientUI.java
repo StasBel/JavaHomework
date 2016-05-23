@@ -1,6 +1,9 @@
 package ru.spbau.mit;
 
 import javax.swing.*;
+import javax.swing.border.EtchedBorder;
+import javax.swing.event.ListSelectionEvent;
+import javax.swing.event.ListSelectionListener;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -26,10 +29,6 @@ public class ClientUI extends Client {
         super(portNumber, ipAddress, directoryStr);
 
         ui = new TorrentUI();
-
-        /*SwingUtilities.invokeLater(() -> {
-            ui = new TorrentUI();
-        });*/
     }
 
     public static void main(String[] args) {
@@ -59,6 +58,7 @@ public class ClientUI extends Client {
         }
     }
 
+    // SYNC
     public void updateTable() throws IOException {
         final ListAnswer listAnswer = executeList();
 
@@ -99,9 +99,11 @@ public class ClientUI extends Client {
     private class TorrentUI extends JFrame implements ActionListener {
         private final JButton downloadButton;
         private final JButton newFileButton;
+        private final JButton refreshButton;
         private final JScrollPane scrollPane;
         private final JProgressBar progressBar;
         private final JFileChooser fileChooser;
+        private Object[][] data;
 
         public TorrentUI() throws HeadlessException {
             super(NAME);
@@ -120,24 +122,17 @@ public class ClientUI extends Client {
             menuPanel.setLayout(new BoxLayout(menuPanel, BoxLayout.Y_AXIS));
             Dimension buttonsDimension = new Dimension(150, 30);
 
-            downloadButton = new JButton("Загрузить");
-            downloadButton.setPreferredSize(buttonsDimension);
-            downloadButton.setMinimumSize(buttonsDimension);
-            downloadButton.setMaximumSize(buttonsDimension);
-            downloadButton.setAlignmentX(Component.CENTER_ALIGNMENT);
+            downloadButton = makeButton("Загрузить", buttonsDimension);
+            newFileButton = makeButton("Новый файл", buttonsDimension);
+            refreshButton = makeButton("Обновить", buttonsDimension);
 
-            newFileButton = new JButton("Новый файл");
-            newFileButton.setPreferredSize(buttonsDimension);
-            newFileButton.setMinimumSize(buttonsDimension);
-            newFileButton.setMaximumSize(buttonsDimension);
-            newFileButton.setAlignmentX(Component.CENTER_ALIGNMENT);
-            newFileButton.addActionListener(this);
             fileChooser = new JFileChooser();
             File workingDirectory = new File(System.getProperty("user.dir"), directoryStr);
             fileChooser.setCurrentDirectory(workingDirectory);
 
             menuPanel.add(downloadButton);
             menuPanel.add(newFileButton);
+            menuPanel.add(refreshButton);
             add(menuPanel, BorderLayout.WEST);
 
             // TABLE
@@ -155,19 +150,79 @@ public class ClientUI extends Client {
         public void actionPerformed(ActionEvent e) {
             if (e.getSource() == newFileButton) {
                 if (fileChooser.showOpenDialog(TorrentUI.this) == JFileChooser.APPROVE_OPTION) {
+                    SwingUtilities.invokeLater(() -> {
+                        try {
+                            commitFile(fileChooser.getSelectedFile());
+                            updateTable();
+                        } catch (IOException exception) {
+                            exception.printStackTrace();
+                        }
+                    });
+                }
+            } else if (e.getSource() == refreshButton) {
+                SwingUtilities.invokeLater(() -> {
                     try {
-                        //System.out.print(fileChooser.getSelectedFile().getAbsolutePath());
-                        commitFile(fileChooser.getSelectedFile().getName());
                         updateTable();
                     } catch (IOException exception) {
                         exception.printStackTrace();
                     }
+                });
+            }
+        }
+
+        private int getSelectedIndex(ListSelectionEvent e) {
+            String strSource = e.getSource().toString();
+            int start = strSource.indexOf("{") + 1,
+                    stop = strSource.length() - 1;
+            return Integer.parseInt(strSource.substring(start, stop));
+        }
+
+        private void showStat(int id) {
+            final FileMeta fileMeta;
+            synchronized (files) {
+                fileMeta = files.get(id);
+            }
+
+            if (fileMeta != null) {
+                synchronized (fileMeta.getParts()) {
+                    final int numberOfParts = getNumberOfParts(fileMeta.getSize());
+                    final int weHave = fileMeta.getParts().size();
+
+                    progressBar.setValue((int) Math.ceil(weHave * 100 / numberOfParts));
+                    progressBar.setVisible(true);
                 }
             }
         }
 
         private JTable makeTable(Object[][] data) {
-            return new JTable(data, new String[]{"id", "name", "size", "status"});
+            this.data = data;
+            final JTable result = new JTable(data, new String[]{"id", "name", "size", "status"});
+            result.setBorder(new EtchedBorder(EtchedBorder.RAISED));
+            result.setGridColor(Color.BLACK);
+            result.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+            result.getSelectionModel().addListSelectionListener(new ListSelectionListener() {
+                @Override
+                public void valueChanged(ListSelectionEvent e) {
+                    if (e.getValueIsAdjusting()) {
+                        return;
+                    }
+
+                    final int index = getSelectedIndex(e);
+
+                    showStat((Integer) data[index][0]);
+                }
+            });
+            return result;
+        }
+
+        private JButton makeButton(String name, Dimension dimension) {
+            final JButton result = new JButton(name);
+            result.setPreferredSize(dimension);
+            result.setMinimumSize(dimension);
+            result.setMaximumSize(dimension);
+            result.setAlignmentX(Component.CENTER_ALIGNMENT);
+            result.addActionListener(this);
+            return result;
         }
     }
 }
