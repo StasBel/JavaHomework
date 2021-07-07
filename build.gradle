@@ -1,0 +1,23 @@
+group 'ru.spbau.mit.belyaev'
+version '1.0-SNAPSHOT'
+
+apply plugin: 'java'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    testCompile group: 'junit', name: 'junit', version: '4.12'
+    testCompile group: 'com.google.guava', name: 'guava', version: '19.0'
+}
+
+sourceSets {
+    test {
+        resources {
+            file('src/test/java/ru/spbau/mit/belyaev/File1.txt')
+            file('src/test/java/ru/spbau/mit/belyaev/File2.txt')
+            file('src/test/java/ru/spbau/mit/belyaev/File3.txt')
+        }
+    }
+}
